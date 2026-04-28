@@ -34,11 +34,12 @@ Android-приложение для просмотра расписания за
 - **Kotlin Coroutines**
 - **Room**
 - **DataStore Preferences**
-- **OkHttp**
+- **Retrofit/OkHttp**
 - **Jsoup**
 - **Google ML Kit Text Recognition**
 - **KSP**
 - **Gradle Kotlin DSL**
+  
 
 ---
 
