@@ -29,7 +29,7 @@ object LessonNotificationFormatter {
 
         return FormattedLessonNotification(
             title = lines.first(),
-            text = lines.joinToString(separator = "\n")
+            text = lines.drop(1).joinToString(separator = "\n").ifBlank { lines.first() }
         )
     }
 
