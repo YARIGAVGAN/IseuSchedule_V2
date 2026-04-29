@@ -9,4 +9,9 @@ sealed interface AppNavigationCommand {
     ) : AppNavigationCommand
 
     data class ClearBackStackAndNavigate(val route: String) : AppNavigationCommand
+
+    data class ShowToast(
+        val message: String,
+        val durationMillis: Long = 5_000L
+    ) : AppNavigationCommand
 }

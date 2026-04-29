@@ -247,27 +247,17 @@ class WeeklyTimetableHtmlParser {
 
         if (value.isBlank()) return null to ""
 
-        val knownPrefixes = listOf(
-            "практ. зан.",
-            "лаб.",
-            "лек.",
-            "сем.",
-            "конс."
-        )
-
-        val matchedPrefix = knownPrefixes.firstOrNull { prefix ->
-            value.startsWith(prefix, ignoreCase = true)
-        }
-
-        if (matchedPrefix != null) {
+        lessonTypePatterns.firstNotNullOfOrNull { pattern ->
+            val match = pattern.find(value) ?: return@firstNotNullOfOrNull null
+            val matchedPrefix = match.value.normalizeWhitespace().trim()
             val subject = value
-                .removePrefix(matchedPrefix)
+                .removeRange(match.range)
                 .trim()
                 .trim('"')
                 .trim()
 
-            return matchedPrefix to subject
-        }
+            matchedPrefix to subject
+        }?.let { return it }
 
         return null to value
     }
@@ -387,6 +377,15 @@ class WeeklyTimetableHtmlParser {
         normalizeWhitespace().ifBlank { null }
 
     private companion object {
+        val lessonTypePatterns = listOf(
+            Regex("""(?i)^\s*практ\.?\s*зан\.?\s*"""),
+            Regex("""(?i)^\s*лаб\.?\s*"""),
+            Regex("""(?i)^\s*лек\.?\s*"""),
+            Regex("""(?i)^\s*сем\.?\s*"""),
+            Regex("""(?i)^\s*конс\.?\s*"""),
+            Regex("""(?i)^\s*зач\.?\s*"""),
+            Regex("""(?i)^\s*экз\.?\s*""")
+        )
         val explicitSubgroupPatterns = listOf(
             Regex("""(?i)(?<![\p{L}\p{N}])([12])\s*(?:п\s*/\s*гр|п\.?\s*гр|подгр\.?|подгруппа)(?![\p{L}\p{N}])"""),
             Regex("""(?i)(?<![\p{L}\p{N}])(?:п\s*/\s*гр|п\.?\s*гр|подгр\.?|подгруппа)\s*([12])(?![\p{L}\p{N}])""")

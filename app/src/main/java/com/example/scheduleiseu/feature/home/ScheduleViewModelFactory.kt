@@ -20,12 +20,14 @@ import com.example.scheduleiseu.domain.core.usecase.ObserveOwnStudentScheduleFor
 import com.example.scheduleiseu.domain.core.usecase.ObserveOwnStudentScheduleUseCase
 import com.example.scheduleiseu.domain.core.usecase.RefreshOwnStudentScheduleForWeekUseCase
 import com.example.scheduleiseu.domain.core.usecase.RefreshOwnStudentScheduleUseCase
+import com.example.scheduleiseu.domain.core.usecase.ScheduleLessonVisibilityFilter
 
 class ScheduleViewModelFactory(
     private val scheduleRepository: ScheduleRepository = ScheduleRepositoryFactory.create(),
     private val studentRegistrationRepository: StudentRegistrationRepository = StudentRegistrationRepositoryFactory.create(),
     private val teacherRegistrationRepository: TeacherRegistrationRepository = TeacherRegistrationRepositoryFactory.create(),
-    private val networkMonitor: NetworkMonitor = BsuCabinetDataComponent.networkMonitor
+    private val networkMonitor: NetworkMonitor = BsuCabinetDataComponent.networkMonitor,
+    private val visibilityFilter: ScheduleLessonVisibilityFilter = BsuCabinetDataComponent.scheduleLessonVisibilityFilter
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -77,7 +79,8 @@ class ScheduleViewModelFactory(
                 scheduleRepository = scheduleRepository,
                 teacherRegistrationRepository = teacherRegistrationRepository
             ),
-            networkMonitor = networkMonitor
+            networkMonitor = networkMonitor,
+            visibilityFilter = visibilityFilter
         ) as T
     }
 }

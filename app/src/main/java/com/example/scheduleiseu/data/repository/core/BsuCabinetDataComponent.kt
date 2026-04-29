@@ -9,6 +9,7 @@ import com.example.scheduleiseu.data.remote.cookie.MemoryCookieJar
 import com.example.scheduleiseu.data.remote.parser.BsuParser
 import com.example.scheduleiseu.data.session.AuthSessionStore
 import com.example.scheduleiseu.domain.core.network.NetworkMonitor
+import com.example.scheduleiseu.domain.core.usecase.ScheduleLessonVisibilityFilter
 import com.example.scheduleiseu.notification.LessonNotificationScheduler
 
 object BsuCabinetDataComponent {
@@ -39,11 +40,16 @@ object BsuCabinetDataComponent {
         AndroidNetworkMonitor(requireApplicationContext())
     }
 
+    val scheduleLessonVisibilityFilter: ScheduleLessonVisibilityFilter by lazy {
+        ScheduleLessonVisibilityFilter()
+    }
+
     val lessonNotificationScheduler: LessonNotificationScheduler by lazy {
         LessonNotificationScheduler(
             context = requireApplicationContext(),
             preferencesDataSource = preferences,
-            scheduleCacheDao = database.scheduleCacheDao()
+            scheduleCacheDao = database.scheduleCacheDao(),
+            visibilityFilter = scheduleLessonVisibilityFilter
         )
     }
 

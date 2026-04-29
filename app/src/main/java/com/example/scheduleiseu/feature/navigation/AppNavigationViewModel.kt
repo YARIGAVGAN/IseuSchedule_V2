@@ -344,26 +344,47 @@ class AppNavigationViewModel(
             when (id) {
                 CACHE_CURRENT_AND_PREVIOUS_WEEK_ID -> {
                     preferencesDataSource.setCacheCurrentAndPreviousWeekEnabled(checked)
+                    var lessonNotificationsEnabled = preferencesDataSource.isLessonNotificationsEnabled()
                     if (!checked) {
                         scheduleRepository.clearAllCachedScheduleWeeks()
+                        preferencesDataSource.setLessonNotificationsEnabled(false)
+                        lessonNotificationScheduler.cancelAll()
+                        lessonNotificationsEnabled = false
+                        _commands.emit(AppNavigationCommand.ShowToast(NOTIFICATIONS_DISABLED_MESSAGE))
                     }
                     updateSettingsState(
                         cacheCurrentAndPreviousWeek = checked,
-                        lessonNotificationsEnabled = preferencesDataSource.isLessonNotificationsEnabled(),
+                        lessonNotificationsEnabled = lessonNotificationsEnabled,
                         showMismatchedSubgroupLessons = preferencesDataSource.isShowMismatchedSubgroupLessonsEnabled()
                     )
                 }
 
                 SHOW_MISMATCHED_SUBGROUP_LESSONS_ID -> {
                     preferencesDataSource.setShowMismatchedSubgroupLessonsEnabled(checked)
+                    val lessonNotificationsEnabled = preferencesDataSource.isLessonNotificationsEnabled()
                     updateSettingsState(
                         cacheCurrentAndPreviousWeek = preferencesDataSource.isCacheCurrentAndPreviousWeekEnabled(),
-                        lessonNotificationsEnabled = preferencesDataSource.isLessonNotificationsEnabled(),
+                        lessonNotificationsEnabled = lessonNotificationsEnabled,
                         showMismatchedSubgroupLessons = checked
                     )
+                    if (lessonNotificationsEnabled) {
+                        lessonNotificationScheduler.scheduleNext()
+                    }
                 }
 
                 LESSON_NOTIFICATIONS_ID -> {
+                    if (checked && !lessonNotificationScheduler.hasSavedScheduleCache()) {
+                        preferencesDataSource.setLessonNotificationsEnabled(false)
+                        lessonNotificationScheduler.cancelAll()
+                        updateSettingsState(
+                            cacheCurrentAndPreviousWeek = preferencesDataSource.isCacheCurrentAndPreviousWeekEnabled(),
+                            lessonNotificationsEnabled = false,
+                            showMismatchedSubgroupLessons = preferencesDataSource.isShowMismatchedSubgroupLessonsEnabled()
+                        )
+                        _commands.emit(AppNavigationCommand.ShowToast(NO_SAVED_SCHEDULE_CACHE_MESSAGE))
+                        return@launch
+                    }
+
                     preferencesDataSource.setLessonNotificationsEnabled(checked)
                     updateSettingsState(
                         cacheCurrentAndPreviousWeek = preferencesDataSource.isCacheCurrentAndPreviousWeekEnabled(),
@@ -372,7 +393,6 @@ class AppNavigationViewModel(
                     )
                     if (checked) {
                         requestPostNotificationsPermission()
-                        lessonNotificationScheduler.scheduleNext()
                     } else {
                         lessonNotificationScheduler.cancelAll()
                     }
@@ -383,6 +403,17 @@ class AppNavigationViewModel(
 
     fun scheduleLessonNotifications() {
         viewModelScope.launch {
+            if (!lessonNotificationScheduler.hasSavedScheduleCache()) {
+                preferencesDataSource.setLessonNotificationsEnabled(false)
+                lessonNotificationScheduler.cancelAll()
+                updateSettingsState(
+                    cacheCurrentAndPreviousWeek = preferencesDataSource.isCacheCurrentAndPreviousWeekEnabled(),
+                    lessonNotificationsEnabled = false,
+                    showMismatchedSubgroupLessons = preferencesDataSource.isShowMismatchedSubgroupLessonsEnabled()
+                )
+                _commands.emit(AppNavigationCommand.ShowToast(NO_SAVED_SCHEDULE_CACHE_MESSAGE))
+                return@launch
+            }
             lessonNotificationScheduler.scheduleNext()
         }
     }
@@ -804,6 +835,9 @@ class AppNavigationViewModel(
         const val LESSON_NOTIFICATIONS_ID = "lesson_notifications"
         const val SHOW_MISMATCHED_SUBGROUP_LESSONS_ID = "show_mismatched_subgroup_lessons"
         const val OFFLINE_MESSAGE = "Нет подключения к интернету. Показываем сохраненные данные."
+        const val NO_SAVED_SCHEDULE_CACHE_MESSAGE =
+            "Без сохраненного расписания уведомления невозможны"
+        const val NOTIFICATIONS_DISABLED_MESSAGE = "Уведомления отключены"
 
         fun settingsFrom(
             role: UserRole,

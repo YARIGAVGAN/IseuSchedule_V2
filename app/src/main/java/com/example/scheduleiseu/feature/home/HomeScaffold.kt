@@ -95,7 +95,13 @@ internal fun ScheduleHomeScaffold(
                 onResetTemporaryContextClick = onResetTemporaryContextClick,
                 onScreenSettingsClick = onScreenSettingsClick,
             )
-            content()
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            ) {
+                content()
+            }
         }
     }
 }

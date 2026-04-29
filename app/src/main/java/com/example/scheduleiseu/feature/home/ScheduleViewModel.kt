@@ -331,16 +331,25 @@ class ScheduleViewModel(
             ) { cacheEnabled, showMismatched ->
                 cacheEnabled to showMismatched
             }.collect { (cacheEnabled, showMismatched) ->
+                val initialSubgroupMismatch =
+                    !settingsInitialized &&
+                        lastWeekSource != null &&
+                        showMismatchedSubgroupLessons != showMismatched
                 val cacheChanged = settingsInitialized && cacheWeeksEnabled != cacheEnabled
                 val subgroupChanged = settingsInitialized && showMismatchedSubgroupLessons != showMismatched
                 cacheWeeksEnabled = cacheEnabled
                 showMismatchedSubgroupLessons = showMismatched
                 if (!settingsInitialized) {
                     settingsInitialized = true
+                    if (initialSubgroupMismatch) {
+                        reapplyLastWeek()
+                    }
                     return@collect
                 }
-                if (subgroupChanged || cacheChanged) {
-                    refreshCurrentScheduleAfterSettingsChanged(subgroupChanged = subgroupChanged)
+                if (subgroupChanged) {
+                    reapplyLastWeek()
+                } else if (cacheChanged && !networkMonitor.isCurrentlyOnline()) {
+                    reapplyLastWeek()
                 }
             }
         }
@@ -622,7 +631,7 @@ class ScheduleViewModel(
         val markedContext = context?.markCachedWeeks()
         val selectedWeek = selectedWeekOverride.withCachedFlag()
         val selectedDay = resolveSelectedDayForApply(
-            days = filteredWeek.days,
+            week = filteredWeek,
             selectedWeek = selectedWeekOverride,
             defaultSelectedDay = selectedDayOverride
         )
@@ -652,13 +661,18 @@ class ScheduleViewModel(
     }
 
     private fun resolveSelectedDayForApply(
-        days: List<ScheduleDay>,
+        week: ScheduleWeek,
         selectedWeek: WeekInfo,
         defaultSelectedDay: ScheduleDay?
     ): ScheduleDay? {
         val manuallySelectedDate = manuallySelectedDayByWeekValue[selectedWeek.value]
+        val days = week.days
         return manuallySelectedDate?.let { date -> days.firstOrNull { it.date == date } }
-            ?: defaultSelectedDay
+            ?: defaultSelectedDay?.date?.let { date -> days.firstOrNull { it.date == date } }
+            ?: week.selectedDay
+            ?: week.currentDay
+            ?: days.firstOrNull { it.lessons.isNotEmpty() }
+            ?: days.firstOrNull()
     }
 
     private fun resolveInitialSelectedDay(week: ScheduleWeek): ScheduleDay? {
@@ -735,146 +749,6 @@ class ScheduleViewModel(
             selectedGroupTitle = lastSelectedGroupTitle,
             selectedTeacherName = lastSelectedTeacherName
         )
-    }
-
-    private fun refreshCurrentScheduleAfterSettingsChanged(subgroupChanged: Boolean) {
-        if (!networkMonitor.isCurrentlyOnline()) {
-            if (subgroupChanged) {
-                reapplyLastWeek()
-            }
-            return
-        }
-
-        val selectedWeek = _state.value.selectedWeek ?: _state.value.currentWeek
-        when {
-            selectedWeek == null -> loadInitialSchedule(ScheduleLoadingStage.BackgroundRefresh)
-            !_state.value.selectedTeacherName.isNullOrBlank() || !_state.value.selectedGroupTitle.isNullOrBlank() -> {
-                refreshTemporarySelectedWeekAfterSettingsChanged(selectedWeek)
-            }
-            else -> refreshOwnSelectedWeekAfterSettingsChanged(selectedWeek)
-        }
-    }
-
-    private fun refreshTemporarySelectedWeekAfterSettingsChanged(week: WeekInfo) {
-        val selectedTeacher = _state.value.selectedTeacherName
-        val selectedGroup = _state.value.selectedGroupTitle
-        when {
-            !selectedTeacher.isNullOrBlank() -> {
-                val teacher = _state.value.availableTeachers.firstOrNull { it.fullName == selectedTeacher } ?: return
-                viewModelScope.launch {
-                    setLoading(true, ScheduleLoadingStage.BackgroundRefresh)
-                    runCatching { loadExternalTeacherSchedule(teacher.id, week) }
-                        .onSuccess { weekData ->
-                            applyLoadedWeek(
-                                week = weekData,
-                                context = teacherScheduleContext,
-                                selectedWeekOverride = week,
-                                selectedDayOverride = resolveSelectedDayAfterRefresh(weekData),
-                                isTemporaryContext = true,
-                                selectedGroupTitle = null,
-                                selectedTeacherName = teacher.fullName
-                            )
-                        }
-                        .onFailure { throwable ->
-                            _state.update {
-                                it.copy(
-                                    isLoading = false,
-                                    loadingStage = null,
-                                    errorMessage = throwable.message ?: "Не удалось обновить расписание преподавателя"
-                                )
-                            }
-                        }
-                }
-            }
-            !selectedGroup.isNullOrBlank() -> {
-                val context = ownScheduleContext ?: return
-                val groupId = context.groups.firstOrNull { it.title == selectedGroup }?.id ?: return
-                viewModelScope.launch {
-                    setLoading(true, ScheduleLoadingStage.BackgroundRefresh)
-                    runCatching { loadExternalStudentGroupSchedule(groupId, week) }
-                        .onSuccess { weekData ->
-                            applyLoadedWeek(
-                                week = weekData,
-                                context = ownScheduleContext,
-                                selectedWeekOverride = week,
-                                selectedDayOverride = resolveSelectedDayAfterRefresh(weekData),
-                                isTemporaryContext = true,
-                                selectedGroupTitle = selectedGroup,
-                                selectedTeacherName = null
-                            )
-                        }
-                        .onFailure { throwable ->
-                            _state.update {
-                                it.copy(
-                                    isLoading = false,
-                                    loadingStage = null,
-                                    errorMessage = throwable.message ?: "Не удалось обновить расписание группы"
-                                )
-                            }
-                        }
-                }
-            }
-            else -> refreshOwnSelectedWeekAfterSettingsChanged(week)
-        }
-    }
-
-    private fun refreshOwnSelectedWeekAfterSettingsChanged(week: WeekInfo) {
-        selectedOwnWeekObserverJob?.cancel()
-        selectedOwnWeekObserverJob = viewModelScope.launch {
-            runCatching {
-                observeOwnStudentScheduleForWeek(week).collect { cachedWeek ->
-                    if (cachedWeek != null && _state.value.selectedGroupTitle == null && _state.value.selectedTeacherName == null) {
-                        applyLoadedWeek(
-                            week = cachedWeek,
-                            context = ownScheduleContext,
-                            selectedWeekOverride = week,
-                            selectedDayOverride = resolveSelectedDayAfterRefresh(cachedWeek),
-                            isTemporaryContext = false,
-                            selectedGroupTitle = null,
-                            selectedTeacherName = null
-                        )
-                    }
-                }
-            }
-        }
-
-        viewModelScope.launch {
-            setLoading(true, ScheduleLoadingStage.BackgroundRefresh)
-            runCatching {
-                val context = loadStudentScheduleContext()
-                val weekData = refreshOwnStudentScheduleForWeek(week)
-                context to weekData
-            }.onSuccess { (context, weekData) ->
-                ownScheduleContext = context
-                applyLoadedWeek(
-                    week = weekData,
-                    context = context,
-                    selectedWeekOverride = week,
-                    selectedDayOverride = resolveSelectedDayAfterRefresh(weekData),
-                    isTemporaryContext = false,
-                    selectedGroupTitle = null,
-                    selectedTeacherName = null
-                )
-            }.onFailure { throwable ->
-                _state.update { current ->
-                    current.copy(
-                        isLoading = false,
-                        loadingStage = null,
-                        errorMessage = if (current.days.isEmpty()) {
-                            throwable.message ?: "Не удалось обновить выбранную неделю"
-                        } else {
-                            null
-                        }
-                    )
-                }
-            }
-        }
-    }
-
-    private fun resolveSelectedDayAfterRefresh(week: ScheduleWeek): ScheduleDay? {
-        val currentSelectedDate = _state.value.selectedDay?.date
-        return currentSelectedDate?.let { date -> week.days.firstOrNull { it.date == date } }
-            ?: resolveInitialSelectedDay(week)
     }
 
     private fun String.removeCachedWeekMarker(): String {

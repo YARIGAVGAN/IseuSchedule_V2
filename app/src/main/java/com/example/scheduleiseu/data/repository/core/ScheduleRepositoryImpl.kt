@@ -15,11 +15,13 @@ import com.example.scheduleiseu.domain.core.model.ScheduleContext
 import com.example.scheduleiseu.domain.core.model.ScheduleWeek
 import com.example.scheduleiseu.domain.core.model.WeekInfo
 import com.example.scheduleiseu.domain.core.repository.ScheduleRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -51,7 +53,11 @@ class ScheduleRepositoryImpl(
             ?.let { selectedWeek -> dao.observeByKey(buildCacheKey(ROLE_STUDENT, ownerId, selectedWeek)) }
             ?: dao.observeCurrentOrLatest(ROLE_STUDENT, ownerId)
 
-        return source.map { cached -> cached?.let(ScheduleCacheCodec::fromEntity) }
+        return source.map { cached ->
+            cached?.let { entity ->
+                withContext(Dispatchers.Default) { ScheduleCacheCodec.fromEntity(entity) }
+            }
+        }
     }
 
     override fun observeCachedTeacherSchedule(
@@ -64,7 +70,11 @@ class ScheduleRepositoryImpl(
             ?.let { selectedWeek -> dao.observeByKey(buildCacheKey(ROLE_TEACHER, ownerId, selectedWeek)) }
             ?: dao.observeCurrentOrLatest(ROLE_TEACHER, ownerId)
 
-        return source.map { cached -> cached?.let(ScheduleCacheCodec::fromEntity) }
+        return source.map { cached ->
+            cached?.let { entity ->
+                withContext(Dispatchers.Default) { ScheduleCacheCodec.fromEntity(entity) }
+            }
+        }
     }
 
     override fun observeCachedStudentWeekValues(
@@ -91,12 +101,16 @@ class ScheduleRepositoryImpl(
     ): Flow<List<WeekInfo>> {
         val dao = scheduleCacheDao ?: return flowOf(emptyList())
         val ownerId = buildStudentOwnerId(facultyId, departmentId, courseId, groupId)
-        return dao.observeWeeksForOwner(ROLE_STUDENT, ownerId).map(::toCachedWeekInfos)
+        return dao.observeWeeksForOwner(ROLE_STUDENT, ownerId).map { entities ->
+            withContext(Dispatchers.Default) { toCachedWeekInfos(entities) }
+        }
     }
 
     override fun observeCachedTeacherWeeks(teacherId: String): Flow<List<WeekInfo>> {
         val dao = scheduleCacheDao ?: return flowOf(emptyList())
-        return dao.observeWeeksForOwner(ROLE_TEACHER, teacherId.trim()).map(::toCachedWeekInfos)
+        return dao.observeWeeksForOwner(ROLE_TEACHER, teacherId.trim()).map { entities ->
+            withContext(Dispatchers.Default) { toCachedWeekInfos(entities) }
+        }
     }
 
     override fun clearTeacherSessionState() {
@@ -106,14 +120,14 @@ class ScheduleRepositoryImpl(
         val data = scheduleRemoteDataSource.getInitialStudentPage()
             ?: throw IllegalStateException("Не удалось загрузить контекст расписания студента")
         sessionStore.saveStudentRawState(data)
-        return studentContextMapper.map(data)
+        return withContext(Dispatchers.Default) { studentContextMapper.map(data) }
     }
 
     override suspend fun refreshTeacherScheduleContext(): ScheduleContext {
         val data = scheduleRemoteDataSource.getInitialTeacherPage()
             ?: throw IllegalStateException("Не удалось загрузить контекст расписания преподавателя")
         sessionStore.saveTeacherRawState(data)
-        return teacherContextMapper.map(data)
+        return withContext(Dispatchers.Default) { teacherContextMapper.map(data) }
     }
 
     override suspend fun refreshStudentCurrentWeek(): WeekInfo? {
@@ -132,7 +146,7 @@ class ScheduleRepositoryImpl(
         val updated = scheduleRemoteDataSource.updateOnFacultySelect(facultyId, currentData)
             ?: throw IllegalStateException("Не удалось обновить контекст после выбора факультета")
         sessionStore.saveStudentRawState(updated)
-        return studentContextMapper.map(updated)
+        return withContext(Dispatchers.Default) { studentContextMapper.map(updated) }
     }
 
     override suspend fun updateStudentContextByDepartment(
@@ -147,7 +161,7 @@ class ScheduleRepositoryImpl(
             currentData = currentData
         ) ?: throw IllegalStateException("Не удалось обновить контекст после выбора формы обучения")
         sessionStore.saveStudentRawState(updated)
-        return studentContextMapper.map(updated)
+        return withContext(Dispatchers.Default) { studentContextMapper.map(updated) }
     }
 
     override suspend fun updateStudentContextByCourse(
@@ -164,7 +178,7 @@ class ScheduleRepositoryImpl(
             currentData = currentData
         ) ?: throw IllegalStateException("Не удалось обновить контекст после выбора курса")
         sessionStore.saveStudentRawState(updated)
-        return studentContextMapper.map(updated)
+        return withContext(Dispatchers.Default) { studentContextMapper.map(updated) }
     }
 
     override suspend fun refreshStudentSchedule(
@@ -193,7 +207,7 @@ class ScheduleRepositoryImpl(
         ) ?: throw IllegalStateException("Не удалось загрузить расписание студента")
 
         sessionStore.saveStudentRawState(weekState)
-        val scheduleWeek = studentWeekMapper.map(weekState)
+        val scheduleWeek = withContext(Dispatchers.Default) { studentWeekMapper.map(weekState) }
         val requestedWeek = week.normalizedAgainst(scheduleWeek.week)
 
         saveScheduleCache(
@@ -235,7 +249,7 @@ class ScheduleRepositoryImpl(
         ) ?: throw IllegalStateException("Не удалось загрузить расписание преподавателя")
 
         sessionStore.saveTeacherRawState(weekState)
-        val scheduleWeek = teacherWeekMapper.map(weekState)
+        val scheduleWeek = withContext(Dispatchers.Default) { teacherWeekMapper.map(weekState) }
         val requestedWeek = week.normalizedAgainst(scheduleWeek.week)
 
         saveScheduleCache(
@@ -322,7 +336,8 @@ class ScheduleRepositoryImpl(
 
         if (cacheableWeek != null) {
             dao.upsert(
-                ScheduleCacheCodec.toEntity(
+                withContext(Dispatchers.Default) {
+                    ScheduleCacheCodec.toEntity(
                     cacheKey = buildCacheKey(role = role, ownerId = ownerId, week = cacheableWeek),
                     role = role,
                     ownerId = ownerId,
@@ -330,6 +345,7 @@ class ScheduleRepositoryImpl(
                     isCurrentWeek = current?.value == cacheableWeek.value,
                     isNextWeek = false
                 )
+                }
             )
         }
 
@@ -364,7 +380,7 @@ class ScheduleRepositoryImpl(
                     weekDate = targetWeek.value,
                     currentData = selectedState
                 ) ?: return@runCatching
-                val scheduleWeek = studentWeekMapper.map(targetState)
+                val scheduleWeek = withContext(Dispatchers.Default) { studentWeekMapper.map(targetState) }
                 val normalizedWeek = targetWeek.normalizedAgainst(scheduleWeek.week)
                 saveScheduleCache(
                     role = ROLE_STUDENT,
@@ -400,7 +416,7 @@ class ScheduleRepositoryImpl(
                     weekDate = targetWeek.value,
                     currentData = currentData
                 ) ?: return@runCatching
-                val scheduleWeek = teacherWeekMapper.map(targetState)
+                val scheduleWeek = withContext(Dispatchers.Default) { teacherWeekMapper.map(targetState) }
                 val normalizedWeek = targetWeek.normalizedAgainst(scheduleWeek.week)
                 saveScheduleCache(
                     role = ROLE_TEACHER,

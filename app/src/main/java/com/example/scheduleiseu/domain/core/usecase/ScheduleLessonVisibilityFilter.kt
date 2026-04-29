@@ -4,6 +4,22 @@ import com.example.scheduleiseu.domain.core.model.ScheduleWeek
 
 class ScheduleLessonVisibilityFilter {
 
+    fun filterForNotifications(
+        week: ScheduleWeek,
+        userRole: com.example.scheduleiseu.domain.core.model.UserRole,
+        registeredSubgroup: String?,
+        showMismatchedSubgroupLessons: Boolean
+    ): ScheduleWeek {
+        return when (userRole) {
+            com.example.scheduleiseu.domain.core.model.UserRole.TEACHER -> week
+            com.example.scheduleiseu.domain.core.model.UserRole.STUDENT -> filterForStudentSubgroup(
+                week = week,
+                registeredSubgroup = registeredSubgroup,
+                showMismatchedSubgroupLessons = showMismatchedSubgroupLessons
+            )
+        }
+    }
+
     fun filterForStudentSubgroup(
         week: ScheduleWeek,
         registeredSubgroup: String?,

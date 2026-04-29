@@ -2,23 +2,19 @@ package com.example.scheduleiseu.feature.home
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
-import com.example.scheduleiseu.core.designsystem.theme.AppColors
-import com.example.scheduleiseu.core.designsystem.theme.AppFontFamily
 import com.example.scheduleiseu.core.designsystem.theme.AppSpacing
 import com.example.scheduleiseu.core.designsystem.theme.ScheduleIsEuTheme
-import com.example.scheduleiseu.core.ui.animation.AppCrossfade
-import com.example.scheduleiseu.core.ui.animation.appAnimatedContentSize
 import com.example.scheduleiseu.domain.core.model.Lesson
 import com.example.scheduleiseu.domain.core.model.ScheduleDay
 
@@ -38,7 +34,7 @@ fun TeacherHomeScreen(
         selectedDay = state.selectedDay,
         modifier = modifier,
     ) {
-        Box(modifier = Modifier.fillMaxWidth()) {
+        Box(modifier = Modifier.fillMaxSize()) {
             LazyColumn(contentPadding = PaddingValues(bottom = AppSpacing.lg)) {
                 scheduleStickyHeader(
                     days = state.days,
@@ -54,37 +50,19 @@ fun TeacherHomeScreen(
                     }
                 }
                 item { ScheduleStatusBanner(state = state) }
-                item(key = "teacher-lessons-${state.selectedDay?.date.orEmpty()}") {
-                    AppCrossfade(
-                        targetState = state.lessonsForSelectedDay,
-                        label = "teacherScheduleLessons",
-                    ) { lessons ->
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .appAnimatedContentSize()
-                        ) {
-                            lessons.forEach { lesson ->
-                                TeacherLessonCard(
-                                    lesson = lesson,
-                                    modifier = Modifier.padding(horizontal = AppSpacing.md, vertical = AppSpacing.xs),
-                                )
-                            }
-                        }
-                    }
+                items(
+                    items = state.lessonsForSelectedDay,
+                    key = { lesson -> "${state.selectedDay?.date.orEmpty()}_${lesson.id}" }
+                ) { lesson ->
+                    TeacherLessonCard(
+                        lesson = lesson,
+                        modifier = Modifier.padding(horizontal = AppSpacing.md, vertical = AppSpacing.xs),
+                    )
                 }
             }
 
-            AppCrossfade(
-                targetState = when {
-                    state.isLoading && state.days.isEmpty() -> "loading"
-                    else -> "content"
-                },
-                label = "teacherScheduleState",
-            ) { targetState ->
-                when (targetState) {
-                    "loading" -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                }
+            if (state.isLoading && state.days.isEmpty()) {
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             }
         }
     }

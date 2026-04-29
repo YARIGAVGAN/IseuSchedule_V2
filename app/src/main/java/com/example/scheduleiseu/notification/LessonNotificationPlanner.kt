@@ -80,6 +80,7 @@ class LessonNotificationPlanner(
             }
 
             val key = ForeignLanguageSlotKey(
+                date = timedLesson.lesson.date.orEmpty(),
                 startMillis = timedLesson.startMillis,
                 endMillis = timedLesson.endMillis
             )
@@ -162,6 +163,7 @@ class LessonNotificationPlanner(
     )
 
     private data class ForeignLanguageSlotKey(
+        val date: String,
         val startMillis: Long,
         val endMillis: Long?
     )

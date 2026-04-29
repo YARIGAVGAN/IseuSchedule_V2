@@ -12,6 +12,8 @@ import com.example.scheduleiseu.data.local.preferences.AppPreferencesDataSource
 import com.example.scheduleiseu.domain.core.model.ScheduleWeek
 import com.example.scheduleiseu.domain.core.model.UserRole
 import com.example.scheduleiseu.domain.core.usecase.ScheduleLessonVisibilityFilter
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class LessonNotificationScheduler(
     private val context: Context,
@@ -53,6 +55,14 @@ class LessonNotificationScheduler(
         cancelPendingAlarm()
     }
 
+    suspend fun hasSavedScheduleCache(): Boolean {
+        val role = preferencesDataSource.getUserRole() ?: return false
+        return when (role) {
+            UserRole.STUDENT -> loadStudentScheduleWeeks().isNotEmpty()
+            UserRole.TEACHER -> loadTeacherScheduleWeeks().isNotEmpty()
+        }
+    }
+
     private suspend fun findNextEvent(nowMillis: Long): LessonNotificationEvent? {
         val role = preferencesDataSource.getUserRole() ?: return null
         val cachedWeeks = when (role) {
@@ -73,13 +83,19 @@ class LessonNotificationScheduler(
         val courseId = profile.courseId?.takeIf { it.isNotBlank() } ?: return emptyList()
         val groupId = profile.groupId?.takeIf { it.isNotBlank() } ?: return emptyList()
         val ownerId = listOf(facultyId, departmentId, courseId, groupId).joinToString(separator = ":")
+        val showMismatchedSubgroupLessons = preferencesDataSource.isShowMismatchedSubgroupLessonsEnabled()
         return scheduleCacheDao.getWeeksForOwner(ROLE_STUDENT, ownerId)
-            .mapNotNull { entity -> runCatching { ScheduleCacheCodec.fromEntity(entity) }.getOrNull() }
+            .mapNotNull { entity ->
+                runCatching {
+                    withContext(Dispatchers.Default) { ScheduleCacheCodec.fromEntity(entity) }
+                }.getOrNull()
+            }
             .map { week ->
-                visibilityFilter.filterForStudentSubgroup(
+                visibilityFilter.filterForNotifications(
                     week = week,
+                    userRole = UserRole.STUDENT,
                     registeredSubgroup = profile.subgroup,
-                    showMismatchedSubgroupLessons = false
+                    showMismatchedSubgroupLessons = showMismatchedSubgroupLessons
                 )
             }
     }
@@ -88,7 +104,11 @@ class LessonNotificationScheduler(
         val profile = preferencesDataSource.getTeacherProfile() ?: return emptyList()
         val teacherId = profile.teacherId?.trim()?.takeIf { it.isNotBlank() } ?: return emptyList()
         return scheduleCacheDao.getWeeksForOwner(ROLE_TEACHER, teacherId)
-            .mapNotNull { entity -> runCatching { ScheduleCacheCodec.fromEntity(entity) }.getOrNull() }
+            .mapNotNull { entity ->
+                runCatching {
+                    withContext(Dispatchers.Default) { ScheduleCacheCodec.fromEntity(entity) }
+                }.getOrNull()
+            }
     }
 
     private fun createPendingIntent(event: LessonNotificationEvent): PendingIntent {
