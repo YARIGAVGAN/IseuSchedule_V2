@@ -38,6 +38,8 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
@@ -290,18 +292,24 @@ private fun AuthTextField(
     visualTransformation: VisualTransformation = VisualTransformation.None,
     trailingIcon: @Composable (() -> Unit)? = null
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
         modifier = modifier.fillMaxWidth(),
         enabled = enabled,
         singleLine = true,
+        interactionSource = interactionSource,
         textStyle = MaterialTheme.typography.bodyMedium.copy(color = AppColors.FieldText),
-        label = {
-            Text(
-                text = label,
-                color = AppColors.White
-            )
+        placeholder = {
+            if (!isFocused && value.isBlank()) {
+                Text(
+                    text = label,
+                    color = AppColors.FieldText
+                )
+            }
         },
         keyboardOptions = keyboardOptions,
         visualTransformation = visualTransformation,
@@ -317,9 +325,9 @@ private fun AuthTextField(
             focusedBorderColor = AppColors.LightGreen,
             unfocusedBorderColor = AppColors.FieldBorder,
             disabledBorderColor = AppColors.FieldBorder.copy(alpha = 0.6f),
-            focusedLabelColor = AppColors.FieldText.copy(alpha = 0.82f),
-            unfocusedLabelColor = AppColors.FieldText.copy(alpha = 0.7f),
-            disabledLabelColor = AppColors.FieldText.copy(alpha = 0.45f),
+            focusedPlaceholderColor = AppColors.FieldText,
+            unfocusedPlaceholderColor = AppColors.FieldText,
+            disabledPlaceholderColor = AppColors.FieldText.copy(alpha = 0.45f),
             cursorColor = AppColors.LightGreen
         )
     )

@@ -38,6 +38,7 @@ class LessonNotificationPlanner(
             type = LessonNotificationType.FIRST_LESSON_SOON,
             triggerAtMillis = firstLesson.startMillis - FIRST_LESSON_OFFSET_MILLIS,
             lessonTitle = firstLesson.lesson.title,
+            lessonType = firstLesson.lesson.type,
             classroom = firstLesson.lesson.classroom
         )
 
@@ -52,6 +53,7 @@ class LessonNotificationPlanner(
                 type = LessonNotificationType.NEXT_LESSON,
                 triggerAtMillis = currentEnd,
                 lessonTitle = next.lesson.title,
+                lessonType = next.lesson.type,
                 classroom = next.lesson.classroom,
                 minutesUntilStart = minutesUntilStart
             )

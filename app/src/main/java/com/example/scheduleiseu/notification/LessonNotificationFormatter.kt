@@ -1,5 +1,7 @@
 package com.example.scheduleiseu.notification
 
+import com.example.scheduleiseu.domain.core.model.toFormattedLessonTypeLabel
+
 data class FormattedLessonNotification(
     val title: String,
     val text: String
@@ -10,12 +12,14 @@ object LessonNotificationFormatter {
         val lines = when (event.type) {
             LessonNotificationType.FIRST_LESSON_SOON -> buildList {
                 add("Первая пара: ${event.lessonTitle.orEmpty()}")
+                event.lessonType.toFormattedLessonTypeLabel()?.let { add("Тип занятия: $it") }
                 event.classroom?.trim()?.takeIf { it.isNotBlank() }?.let(::add)
                 add("Начало через 15 минут")
             }
 
             LessonNotificationType.NEXT_LESSON -> buildList {
                 add("Следующая пара: ${event.lessonTitle.orEmpty()}")
+                event.lessonType.toFormattedLessonTypeLabel()?.let { add("Тип занятия: $it") }
                 event.classroom?.trim()?.takeIf { it.isNotBlank() }?.let(::add)
                 val minutes = event.minutesUntilStart?.coerceAtLeast(0) ?: 0
                 add(if (minutes == 0) "Начало сейчас" else "Начало через $minutes ${minutes.minutesWord()}")

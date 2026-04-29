@@ -309,7 +309,7 @@ class WeeklyTimetableHtmlParser {
         return value
             .replace(Regex("\\s+"), " ")
             .trim()
-            .trim(',', ';', '-', '(', ')')
+            .trim(',', ';', '-')
             .trim()
     }
 

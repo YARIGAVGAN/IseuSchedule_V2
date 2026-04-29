@@ -1,7 +1,6 @@
 package com.example.scheduleiseu.feature.home
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -26,7 +25,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -41,6 +39,7 @@ import com.example.scheduleiseu.core.ui.animation.appAnimatedContentSize
 import com.example.scheduleiseu.core.ui.animation.appRevealMotion
 import com.example.scheduleiseu.domain.core.model.Lesson
 import com.example.scheduleiseu.domain.core.model.ScheduleDay
+import com.example.scheduleiseu.domain.core.model.toFormattedLessonTypeLabel
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -124,6 +123,7 @@ internal fun EmptyScheduleMessage(
 }
 
 @Composable
+
 private fun LessonCard(
     lesson: Lesson,
     modifier: Modifier = Modifier,
@@ -133,6 +133,9 @@ private fun LessonCard(
         lesson.note?.trim()?.takeIf { it.isNotBlank() }
     ).joinToString(", ")
     val subgroupLine = lesson.subgroup.orEmpty().trim().toSubgroupDisplayText()
+    val lessonType = lesson.type.toFormattedLessonTypeLabel()
+    val hasLessonType = !lessonType.isNullOrBlank()
+    val contentTopPadding = if (hasLessonType) 36.dp else 12.dp
 
     PressScale(
         modifier = modifier
@@ -152,32 +155,27 @@ private fun LessonCard(
                     .background(color = AppColors.LessonCard, shape = AppShapes.medium)
                     .border(width = 3.dp, color = AppColors.LessonBorder, shape = AppShapes.medium),
             ) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .wrapContentSize(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.header_card),
-                        contentDescription = "Тип занятия",
+                if (hasLessonType) {
+                    Box(
                         modifier = Modifier
-                            .matchParentSize()
-                            .padding(2.dp),
-                    )
-
-                    TextLine(
-                        text = lesson.type.orEmpty(),
-                        fontSize = 18.sp,
-                        color = AppColors.Black,
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
-                    )
+                            .align(Alignment.TopCenter)
+                            .background(color = AppColors.White, shape = AppShapes.medium)
+                            .padding(horizontal = 14.dp, vertical = 4.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        TextLine(
+                            text = lessonType.orEmpty(),
+                            fontSize = 16.sp,
+                            color = AppColors.Black,
+                            modifier = Modifier.wrapContentWidth(),
+                        )
+                    }
                 }
 
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 9.dp, end = 9.dp, top = 29.dp, bottom = 12.dp),
+                        .padding(start = 9.dp, end = 9.dp, top = contentTopPadding, bottom = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(20.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
