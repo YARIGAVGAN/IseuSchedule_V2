@@ -1,5 +1,6 @@
 package com.example.scheduleiseu.domain.core.usecase
 
+import android.util.Log
 import com.example.scheduleiseu.domain.core.model.ScheduleWeek
 
 class ScheduleLessonVisibilityFilter {
@@ -25,29 +26,25 @@ class ScheduleLessonVisibilityFilter {
         registeredSubgroup: String?,
         showMismatchedSubgroupLessons: Boolean
     ): ScheduleWeek {
+        if (showMismatchedSubgroupLessons) return week
+        Log.d(
+            "SUBGROUP_FILTER",
+            "registeredSubgroup=$registeredSubgroup"
+        )
         val normalizedRegisteredSubgroup = registeredSubgroup.normalizeSubgroup()
-        if (showMismatchedSubgroupLessons || normalizedRegisteredSubgroup == null) {
-            return week
-        }
+            ?: return week
 
         val filteredDays = week.days.map { day ->
             day.copy(
                 lessons = day.lessons.filter { lesson ->
                     val lessonSubgroup = lesson.subgroup.normalizeSubgroup()
+
                     lessonSubgroup == null || lessonSubgroup == normalizedRegisteredSubgroup
                 }
             )
         }
 
-        return week.copy(
-            days = filteredDays,
-            currentDay = week.currentDay?.date?.let { currentDate ->
-                filteredDays.firstOrNull { it.date == currentDate }
-            },
-            selectedDay = week.selectedDay?.date?.let { selectedDate ->
-                filteredDays.firstOrNull { it.date == selectedDate }
-            }
-        )
+        return week.copy(days = filteredDays)
     }
 
     private fun String?.normalizeSubgroup(): String? {

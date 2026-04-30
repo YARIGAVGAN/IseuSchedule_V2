@@ -30,7 +30,7 @@ import kotlinx.coroutines.launch
 
 class ScheduleViewModel(
     private val ownGroupTitle: String?,
-    private val registeredSubgroup: String?,
+    registeredSubgroup: String?,
     private val preferencesDataSource: AppPreferencesDataSource,
     private val observeOwnStudentCachedWeeks: ObserveOwnStudentCachedWeeksUseCase,
     private val observeOwnStudentCachedWeekValues: ObserveOwnStudentCachedWeekValuesUseCase,
@@ -54,6 +54,7 @@ class ScheduleViewModel(
 
     private var ownCurrentWeek: WeekInfo? = null
     private var ownCurrentDayDate: String? = null
+    private var registeredSubgroup: String? = registeredSubgroup
     private var cachedOwnWeekValues: Set<String> = emptySet()
     private var selectedOwnWeekObserverJob: Job? = null
     private val manuallySelectedDayByWeekValue = mutableMapOf<String, String>()
@@ -70,6 +71,7 @@ class ScheduleViewModel(
 
     init {
         observeNetwork()
+        observeStudentProfile()
         observeSettings()
         observeCachedOwnSchedule()
         observeCachedOwnWeeks()
@@ -323,6 +325,18 @@ class ScheduleViewModel(
         }
     }
 
+    private fun observeStudentProfile() {
+        viewModelScope.launch {
+            preferencesDataSource.observeStudentProfile().collect { profile ->
+                val newSubgroup = profile?.subgroup
+                if (registeredSubgroup != newSubgroup) {
+                    registeredSubgroup = newSubgroup
+                    reapplyLastWeek()
+                }
+            }
+        }
+    }
+
     private fun observeSettings() {
         viewModelScope.launch {
             kotlinx.coroutines.flow.combine(
@@ -333,8 +347,8 @@ class ScheduleViewModel(
             }.collect { (cacheEnabled, showMismatched) ->
                 val initialSubgroupMismatch =
                     !settingsInitialized &&
-                        lastWeekSource != null &&
-                        showMismatchedSubgroupLessons != showMismatched
+                            lastWeekSource != null &&
+                            showMismatchedSubgroupLessons != showMismatched
                 val cacheChanged = settingsInitialized && cacheWeeksEnabled != cacheEnabled
                 val subgroupChanged = settingsInitialized && showMismatchedSubgroupLessons != showMismatched
                 cacheWeeksEnabled = cacheEnabled
@@ -427,7 +441,7 @@ class ScheduleViewModel(
 
         viewModelScope.launch {
             val isCachedWeekAlreadyVisible = _state.value.selectedWeek?.value == week.value &&
-                _state.value.days.isNotEmpty()
+                    _state.value.days.isNotEmpty()
             if (!networkMonitor.isCurrentlyOnline()) {
                 _state.update { current ->
                     current.copy(
@@ -582,7 +596,7 @@ class ScheduleViewModel(
         if (normalized.isBlank()) return teachers
         return teachers.filter { teacher ->
             teacher.fullName.contains(normalized, ignoreCase = true) ||
-                teacher.subtitle?.contains(normalized, ignoreCase = true) == true
+                    teacher.subtitle?.contains(normalized, ignoreCase = true) == true
         }
     }
 
@@ -627,7 +641,12 @@ class ScheduleViewModel(
         lastSelectedGroupTitle = selectedGroupTitle
         lastSelectedTeacherName = selectedTeacherName
 
-        val filteredWeek = applyLessonFilters(week, context, selectedTeacherName)
+        val filteredWeek = applyLessonFilters(
+            week = week,
+            context = context,
+            selectedGroupTitle = selectedGroupTitle,
+            selectedTeacherName = selectedTeacherName
+        )
         val markedContext = context?.markCachedWeeks()
         val selectedWeek = selectedWeekOverride.withCachedFlag()
         val selectedDay = resolveSelectedDayForApply(
@@ -667,20 +686,40 @@ class ScheduleViewModel(
     ): ScheduleDay? {
         val manuallySelectedDate = manuallySelectedDayByWeekValue[selectedWeek.value]
         val days = week.days
-        return manuallySelectedDate?.let { date -> days.firstOrNull { it.date == date } }
-            ?: defaultSelectedDay?.date?.let { date -> days.firstOrNull { it.date == date } }
+
+        return manuallySelectedDate
+            ?.let { date -> days.firstOrNull { it.date == date } }
+            ?: defaultSelectedDay
+                ?.date
+                ?.let { date -> days.firstOrNull { it.date == date } }
             ?: week.selectedDay
+                ?.date
+                ?.let { date -> days.firstOrNull { it.date == date } }
             ?: week.currentDay
+                ?.date
+                ?.let { date -> days.firstOrNull { it.date == date } }
+            ?: days.firstOrNull { it.isCurrentDay }
             ?: days.firstOrNull { it.lessons.isNotEmpty() }
             ?: days.firstOrNull()
     }
 
     private fun resolveInitialSelectedDay(week: ScheduleWeek): ScheduleDay? {
+        val days = week.days
+
         return week.currentDay
-            ?: if (week.week.isCurrent) ownCurrentDayDate?.let { expected -> week.days.firstOrNull { it.date == expected } } else null
+            ?.date
+            ?.let { date -> days.firstOrNull { it.date == date } }
+            ?: if (week.week.isCurrent) {
+                ownCurrentDayDate?.let { expected -> days.firstOrNull { it.date == expected } }
+            } else {
+                null
+            }
             ?: week.selectedDay
-            ?: week.days.firstOrNull { it.lessons.isNotEmpty() }
-            ?: week.days.firstOrNull()
+                ?.date
+                ?.let { date -> days.firstOrNull { it.date == date } }
+            ?: days.firstOrNull { it.isCurrentDay }
+            ?: days.firstOrNull { it.lessons.isNotEmpty() }
+            ?: days.firstOrNull()
     }
 
     private fun ScheduleContext.markCachedWeeks(): ScheduleContext {
@@ -702,14 +741,15 @@ class ScheduleViewModel(
     private fun applyLessonFilters(
         week: ScheduleWeek,
         context: ScheduleContext?,
+        selectedGroupTitle: String?,
         selectedTeacherName: String?
     ): ScheduleWeek {
-        val selectedGroupTitle = _state.value.selectedGroupTitle
-        if (
-            context?.userRole == UserRole.TEACHER ||
-            !selectedTeacherName.isNullOrBlank() ||
-            !selectedGroupTitle.isNullOrBlank()
-        ) {
+        val isTeacherModeOrTeacherSchedule =
+            context?.userRole == UserRole.TEACHER || !selectedTeacherName.isNullOrBlank()
+
+        val isExternalStudentGroupPreview = !selectedGroupTitle.isNullOrBlank()
+
+        if (isTeacherModeOrTeacherSchedule || isExternalStudentGroupPreview) {
             return week
         }
 
@@ -733,7 +773,7 @@ class ScheduleViewModel(
         return context.groups
             .filterNot { option ->
                 option.id == context.selectedGroupId ||
-                    option.title == ownGroupTitle
+                        option.title == ownGroupTitle
             }
             .map { it.title }
     }

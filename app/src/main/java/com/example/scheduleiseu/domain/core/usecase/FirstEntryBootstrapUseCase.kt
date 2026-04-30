@@ -113,17 +113,19 @@ class FirstEntryBootstrapUseCase(
     }
 
     private fun StudentProfile.mergeRemoteStudentInfo(remoteProfile: StudentProfile): StudentProfile {
-        return copy(
-            fullName = remoteProfile.fullName.takeIf { it.isNotBlank() } ?: fullName,
-            login = remoteProfile.login.takeUnless(String?::isNullOrBlank) ?: login,
-            faculty = faculty.takeUnless(String?::isNullOrBlank) ?: remoteProfile.faculty,
-            department = department.takeUnless(String?::isNullOrBlank) ?: remoteProfile.department,
-            course = course.takeUnless(String?::isNullOrBlank) ?: remoteProfile.course,
-            group = group.takeUnless(String?::isNullOrBlank) ?: remoteProfile.group,
-            averageScore = remoteProfile.averageScore.takeUnless(String?::isNullOrBlank) ?: averageScore,
-            photo = null
-        )
-    }
+            return copy(
+                fullName = remoteProfile.fullName.takeIf { it.isNotBlank() } ?: fullName,
+                login = remoteProfile.login.takeUnless(String?::isNullOrBlank) ?: login,
+                faculty = faculty.takeUnless(String?::isNullOrBlank) ?: remoteProfile.faculty,
+                department = department.takeUnless(String?::isNullOrBlank) ?: remoteProfile.department,
+                course = course.takeUnless(String?::isNullOrBlank) ?: remoteProfile.course,
+                group = group.takeUnless(String?::isNullOrBlank) ?: remoteProfile.group,
+                subgroup = subgroup,
+                averageScore = remoteProfile.averageScore.takeUnless(String?::isNullOrBlank) ?: averageScore,
+                photo = null
+            )
+        }
+
 
     private fun String.normalizedAccountKey(): String {
         val normalized = trim().lowercase()

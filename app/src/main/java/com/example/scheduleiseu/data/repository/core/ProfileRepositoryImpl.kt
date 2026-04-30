@@ -116,14 +116,18 @@ class ProfileRepositoryImpl(
 
         return copy(
             login = login.takeUnless(String?::isNullOrBlank) ?: savedProfile.login,
+
             facultyId = savedProfile.facultyId,
             departmentId = savedProfile.departmentId,
             courseId = savedProfile.courseId,
             groupId = savedProfile.groupId,
+
             faculty = faculty.takeUnless(String?::isNullOrBlank) ?: savedProfile.faculty,
             department = department.takeUnless(String?::isNullOrBlank) ?: savedProfile.department,
             course = course.takeUnless(String?::isNullOrBlank) ?: savedProfile.course,
             group = group.takeUnless(String?::isNullOrBlank) ?: savedProfile.group,
+            subgroup = savedProfile.subgroup,
+
             averageScore = averageScore.takeUnless(String?::isNullOrBlank) ?: savedProfile.averageScore
         )
     }
