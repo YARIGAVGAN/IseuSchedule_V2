@@ -66,11 +66,6 @@ fun AboutScreen(
                 )
             }
 
-            item {
-                AboutFooterCard(
-                    modifier = Modifier.padding(horizontal = AppSpacing.md),
-                )
-            }
         }
     }
 }
@@ -125,34 +120,6 @@ private fun AboutSectionCard(
     }
 }
 
-@Composable
-private fun AboutFooterCard(modifier: Modifier = Modifier) {
-    AppCard(
-        modifier = modifier,
-        containerColor = AppColors.LightGreen,
-        contentPadding = PaddingValues(AppSpacing.md),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                Text(
-                    text = "Сделано для быстрого доступа к учебным данным",
-                    style = MaterialTheme.typography.titleMedium.copy(color = AppColors.ScreenTitle),
-                )
-                Text(
-                    text = "Раздел повторяет цветовую палитру и паттерны приложения, поэтому выглядит как естественная часть продукта.",
-                    style = MaterialTheme.typography.bodyMedium.copy(color = AppColors.ScreenText),
-                )
-            }
-        }
-    }
-}
 
 @Preview(showBackground = true, backgroundColor = 0xFF000000)
 @Composable
