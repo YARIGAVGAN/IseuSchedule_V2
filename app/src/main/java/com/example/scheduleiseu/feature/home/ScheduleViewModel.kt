@@ -68,6 +68,10 @@ class ScheduleViewModel(
     private var lastIsTemporaryContext = false
     private var lastSelectedGroupTitle: String? = null
     private var lastSelectedTeacherName: String? = null
+    private var lastPrimaryWeekSource: ScheduleWeek? = null
+    private var lastPrimaryContextSource: ScheduleContext? = null
+    private var lastPrimarySelectedWeekOverride: WeekInfo? = null
+    private var lastPrimarySelectedDayOverride: ScheduleDay? = null
 
     init {
         observeNetwork()
@@ -91,6 +95,28 @@ class ScheduleViewModel(
             loadTemporaryWeek(week)
         } else {
             loadOwnWeekAsTemporary(week)
+        }
+    }
+
+    fun onNextWeekRequested() {
+        findAdjacentWeek(step = 1)?.let { week ->
+            resetManualDaySelection(week)
+            if (_state.value.isTemporaryContext) {
+                loadTemporaryWeek(week)
+            } else {
+                loadOwnWeekAsTemporary(week)
+            }
+        }
+    }
+
+    fun onPreviousWeekRequested() {
+        findAdjacentWeek(step = -1)?.let { week ->
+            resetManualDaySelection(week)
+            if (_state.value.isTemporaryContext) {
+                loadTemporaryWeek(week)
+            } else {
+                loadOwnWeekAsTemporary(week)
+            }
         }
     }
 
@@ -193,6 +219,10 @@ class ScheduleViewModel(
     }
 
     fun resetTemporaryContext() {
+        if (!networkMonitor.isCurrentlyOnline()) {
+            restorePrimaryContextOffline()
+            return
+        }
         loadInitialSchedule()
     }
 
@@ -641,6 +671,13 @@ class ScheduleViewModel(
         lastSelectedGroupTitle = selectedGroupTitle
         lastSelectedTeacherName = selectedTeacherName
 
+        if (!isTemporaryContext) {
+            lastPrimaryWeekSource = week
+            lastPrimaryContextSource = context
+            lastPrimarySelectedWeekOverride = selectedWeekOverride
+            lastPrimarySelectedDayOverride = selectedDayOverride
+        }
+
         val filteredWeek = applyLessonFilters(
             week = week,
             context = context,
@@ -791,6 +828,40 @@ class ScheduleViewModel(
         )
     }
 
+    private fun restorePrimaryContextOffline() {
+        selectedOwnWeekObserverJob?.cancel()
+        selectedOwnWeekObserverJob = null
+
+        val week = lastPrimaryWeekSource
+        val selectedWeekOverride = lastPrimarySelectedWeekOverride
+        if (week == null || selectedWeekOverride == null) {
+            _state.update { current ->
+                current.copy(
+                    isLoading = false,
+                    loadingStage = null,
+                    isOfflineMode = true,
+                    offlineMessage = OFFLINE_MESSAGE,
+                    errorMessage = if (current.days.isEmpty()) {
+                        "Нет интернета и сохраненного основного расписания"
+                    } else {
+                        current.errorMessage
+                    }
+                )
+            }
+            return
+        }
+
+        applyLoadedWeek(
+            week = week,
+            context = lastPrimaryContextSource,
+            selectedWeekOverride = selectedWeekOverride,
+            selectedDayOverride = lastPrimarySelectedDayOverride,
+            isTemporaryContext = false,
+            selectedGroupTitle = null,
+            selectedTeacherName = null
+        )
+    }
+
     private fun String.removeCachedWeekMarker(): String {
         return removeSuffix(" +").trim()
     }
@@ -798,5 +869,16 @@ class ScheduleViewModel(
     private fun String.isTeacherPlaceholder(): Boolean {
         val normalized = trim().lowercase()
         return normalized == "выберите фамилию преподавателя" || normalized.startsWith("выберите ")
+    }
+
+    private fun findAdjacentWeek(step: Int): WeekInfo? {
+        val weeks = _state.value.availableWeeks
+        if (weeks.isEmpty()) return null
+
+        val selectedWeekValue = _state.value.selectedWeek?.value ?: return null
+        val currentIndex = weeks.indexOfFirst { it.value == selectedWeekValue }
+        if (currentIndex == -1) return null
+
+        return weeks.getOrNull(currentIndex + step)
     }
 }

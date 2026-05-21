@@ -4,6 +4,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,8 +28,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -78,6 +81,8 @@ internal fun ScheduleHomeScaffold(
     onScreenSettingsClick: () -> Unit,
     selectedDay: ScheduleDay? = null,
     isTemporaryContext: Boolean = false,
+    onNextWeekSwipe: () -> Unit = {},
+    onPreviousWeekSwipe: () -> Unit = {},
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
@@ -94,6 +99,8 @@ internal fun ScheduleHomeScaffold(
                 onMenuClick = onMenuClick,
                 onResetTemporaryContextClick = onResetTemporaryContextClick,
                 onScreenSettingsClick = onScreenSettingsClick,
+                onNextWeekSwipe = onNextWeekSwipe,
+                onPreviousWeekSwipe = onPreviousWeekSwipe,
             )
             Box(
                 modifier = Modifier
@@ -115,8 +122,12 @@ internal fun HomeTopHeader(
     onMenuClick: () -> Unit = {},
     onResetTemporaryContextClick: () -> Unit = {},
     onScreenSettingsClick: () -> Unit = {},
+    onNextWeekSwipe: () -> Unit = {},
+    onPreviousWeekSwipe: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    val swipeThresholdPx = remember { 72f }
+
     Box(modifier = modifier.fillMaxWidth()) {
         androidx.compose.foundation.Image(
             painter = painterResource(id = R.drawable.header_back),
@@ -158,25 +169,59 @@ internal fun HomeTopHeader(
                     }
 
                 Row(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .pointerInput(onNextWeekSwipe, onPreviousWeekSwipe) {
+                            var totalDrag = 0f
+                            detectHorizontalDragGestures(
+                                onDragStart = { totalDrag = 0f },
+                                onHorizontalDrag = { change, dragAmount ->
+                                    change.consume()
+                                    totalDrag += dragAmount
+                                },
+                                onDragEnd = {
+                                    when {
+                                        totalDrag >= swipeThresholdPx -> onNextWeekSwipe()
+                                        totalDrag <= -swipeThresholdPx -> onPreviousWeekSwipe()
+                                    }
+                                    totalDrag = 0f
+                                },
+                                onDragCancel = { totalDrag = 0f }
+                            )
+                        },
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Center,
                 ) {
-                    Text(
-                        text = bigText,
-                        fontSize = 60.sp,
-                        lineHeight = 60.sp,
-                        color = AppColors.White,
-                        maxLines = 1,
-                        fontFamily = AppFontFamily,
-                        modifier = Modifier.appRevealMotion(initialOffsetY = 0f, initialScale = 0.99f),
-                    )
+                    AppCrossfade(
+                        targetState = HeaderDateContent(
+                            bigText = bigText,
+                            topSmallText = topSmallText,
+                            bottomSmallText = bottomSmallText
+                        ),
+                        label = "homeHeaderDateChange"
+                    ) { content ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center,
+                            modifier = Modifier.appAnimatedContentSize()
+                        ) {
+                            Text(
+                                text = content.bigText,
+                                fontSize = 60.sp,
+                                lineHeight = 60.sp,
+                                color = AppColors.White,
+                                maxLines = 1,
+                                fontFamily = AppFontFamily,
+                                modifier = Modifier.appRevealMotion(initialOffsetY = 0f, initialScale = 0.99f),
+                            )
 
-                    Spacer(modifier = Modifier.width(AppSpacing.sm))
+                            Spacer(modifier = Modifier.width(AppSpacing.sm))
 
-                    Column {
-                        HomeHeaderCaption(topSmallText)
-                        HomeHeaderCaption(bottomSmallText)
+                            Column {
+                                HomeHeaderCaption(content.topSmallText)
+                                HomeHeaderCaption(content.bottomSmallText)
+                            }
+                        }
                     }
                 }
 
@@ -191,6 +236,12 @@ internal fun HomeTopHeader(
         }
     }
 }
+
+private data class HeaderDateContent(
+    val bigText: String,
+    val topSmallText: String,
+    val bottomSmallText: String
+)
 
 @Composable
 private fun HeaderPainterIconButton(

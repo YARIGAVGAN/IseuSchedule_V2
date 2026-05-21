@@ -11,6 +11,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -18,6 +19,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.example.scheduleiseu.BuildConfig
 import com.example.scheduleiseu.data.repository.core.BsuCabinetDataComponent
 import com.example.scheduleiseu.domain.core.model.UserRole
 import com.example.scheduleiseu.feature.home.ScheduleUiState
@@ -31,7 +33,9 @@ import com.example.scheduleiseu.feature.menu.MenuProfileViewModelFactory
 import com.example.scheduleiseu.feature.navigation.AppNavigationCommand
 import com.example.scheduleiseu.feature.navigation.AppNavigationViewModel
 import com.example.scheduleiseu.feature.navigation.AppNavigationViewModelFactory
+import com.example.scheduleiseu.feature.whatsnew.WhatsNewDialog
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun AppRoot(
@@ -45,6 +49,8 @@ fun AppRoot(
     val navigationState by navigationViewModel.state.collectAsState()
 
     var activeToast by remember { mutableStateOf<AppToastMessage?>(null) }
+    var shouldShowWhatsNewDialog by remember { mutableStateOf(false) }
+    val appScope = rememberCoroutineScope()
 
     val postNotificationsPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
@@ -90,6 +96,11 @@ fun AppRoot(
         if (activeToast?.id == toast.id) {
             activeToast = null
         }
+    }
+
+    LaunchedEffect(Unit) {
+        val lastSeenBuildId = BsuCabinetDataComponent.preferences.getLastSeenWhatsNewBuildId()
+        shouldShowWhatsNewDialog = lastSeenBuildId != BuildConfig.APP_BUILD_ID
     }
 
     if (!navigationState.isStartResolved) {
@@ -156,5 +167,20 @@ fun AppRoot(
         onRetryClick = navigationViewModel::retryStudentBootstrap
     )
 
+    if (shouldShowWhatsNewDialog) {
+        WhatsNewDialog(
+            message = WHATS_NEW_MESSAGE,
+            onDismiss = {
+                shouldShowWhatsNewDialog = false
+                appScope.launch {
+                    BsuCabinetDataComponent.preferences.setLastSeenWhatsNewBuildId(BuildConfig.APP_BUILD_ID)
+                }
+            }
+        )
+    }
+
     AppToastHost(message = activeToast)
 }
+
+private const val WHATS_NEW_MESSAGE =
+    "Добавили свайп по дате для переключения недель, улучшили анимацию перехода между неделями, обновили отображение типов занятий и исправили возврат из просмотра другой недели без интернета."

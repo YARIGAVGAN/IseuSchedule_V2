@@ -267,6 +267,16 @@ class AppPreferencesDataSource(
         }
     }
 
+    suspend fun getLastSeenWhatsNewBuildId(): String? {
+        return dataStore.data.map { it[Keys.LAST_SEEN_WHATS_NEW_BUILD_ID] }.first()
+    }
+
+    suspend fun setLastSeenWhatsNewBuildId(buildId: String) {
+        dataStore.edit { preferences ->
+            preferences[Keys.LAST_SEEN_WHATS_NEW_BUILD_ID] = buildId
+        }
+    }
+
     private fun Preferences.toStudentProfile(): StudentProfile? {
         val fullName = this[Keys.STUDENT_FULL_NAME]?.takeIf { it.isNotBlank() } ?: return null
         return StudentProfile(
@@ -320,6 +330,7 @@ class AppPreferencesDataSource(
         val LESSON_NOTIFICATIONS_ENABLED = booleanPreferencesKey("lesson_notifications_enabled")
         val SHOW_MISMATCHED_SUBGROUP_LESSONS = booleanPreferencesKey("show_mismatched_subgroup_lessons")
         val STUDENT_SCHEDULE_ONLY_MODE = booleanPreferencesKey("student_schedule_only_mode")
+        val LAST_SEEN_WHATS_NEW_BUILD_ID = stringPreferencesKey("last_seen_whats_new_build_id")
 
         val STUDENT_FULL_NAME = stringPreferencesKey("student_full_name")
         val STUDENT_LOGIN = stringPreferencesKey("student_login")

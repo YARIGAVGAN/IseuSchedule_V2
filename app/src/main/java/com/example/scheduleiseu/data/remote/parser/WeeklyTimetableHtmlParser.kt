@@ -180,7 +180,7 @@ class WeeklyTimetableHtmlParser {
         val studentSubjectSubgroup = extractExplicitSubgroup(studentSubjectWithoutPrefix)
         val studentSubject = studentSubjectWithoutPrefix.removeExplicitSubgroupMarkers()
 
-        val teacherSubject = disciplineRaw
+        val teacherSubject = disciplineRaw.removeAssessmentFormMarkers()
 
         val resolvedSubgroup = when (kind) {
             TimetableKind.TEACHER -> {
@@ -241,7 +241,9 @@ class WeeklyTimetableHtmlParser {
     }
 
     private fun splitLessonTypeAndSubject(raw: String): Pair<String?, String> {
-        val value = raw.normalizeWhitespace()
+        val value = raw
+            .removeAssessmentFormMarkers()
+            .normalizeWhitespace()
             .trim('"')
             .trim()
 
@@ -313,6 +315,13 @@ class WeeklyTimetableHtmlParser {
             .trim()
     }
 
+    private fun String.removeAssessmentFormMarkers(): String {
+        return assessmentFormPattern
+            .replace(this, " ")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+    }
+
     private fun Element.extractTimeRange(): String {
         selectFirst("td.cell-time")
             ?.text()
@@ -378,14 +387,20 @@ class WeeklyTimetableHtmlParser {
 
     private companion object {
         val lessonTypePatterns = listOf(
+            Regex("""(?i)^\s*дифференцированный\s+зач[её]т\.?\s*"""),
+            Regex("""(?i)^\s*диф\.?\s*\+?\s*зач[её]т?\.?\s*"""),
             Regex("""(?i)^\s*практ\.?\s*зан\.?\s*"""),
             Regex("""(?i)^\s*лаб\.?\s*"""),
             Regex("""(?i)^\s*лек\.?\s*"""),
             Regex("""(?i)^\s*сем\.?\s*"""),
             Regex("""(?i)^\s*конс\.?\s*"""),
+            Regex("""(?i)^\s*зач[её]т\.?\s*"""),
             Regex("""(?i)^\s*зач\.?\s*"""),
+            Regex("""(?i)^\s*экзамен\.?\s*"""),
             Regex("""(?i)^\s*экз\.?\s*""")
         )
+        val assessmentFormPattern =
+            Regex("""(?i)\s*\(\s*в\s+(?:устной|письменной)\s+форме\s*\)\s*""")
         val explicitSubgroupPatterns = listOf(
             Regex("""(?i)(?<![\p{L}\p{N}])([12])\s*(?:п\s*/\s*гр|п\.?\s*гр|подгр\.?|подгруппа)(?![\p{L}\p{N}])"""),
             Regex("""(?i)(?<![\p{L}\p{N}])(?:п\s*/\s*гр|п\.?\s*гр|подгр\.?|подгруппа)\s*([12])(?![\p{L}\p{N}])""")

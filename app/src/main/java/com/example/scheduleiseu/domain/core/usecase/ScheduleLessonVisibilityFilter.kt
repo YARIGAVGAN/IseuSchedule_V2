@@ -1,6 +1,5 @@
 package com.example.scheduleiseu.domain.core.usecase
 
-import android.util.Log
 import com.example.scheduleiseu.domain.core.model.ScheduleWeek
 
 class ScheduleLessonVisibilityFilter {
@@ -27,10 +26,6 @@ class ScheduleLessonVisibilityFilter {
         showMismatchedSubgroupLessons: Boolean
     ): ScheduleWeek {
         if (showMismatchedSubgroupLessons) return week
-        Log.d(
-            "SUBGROUP_FILTER",
-            "registeredSubgroup=$registeredSubgroup"
-        )
         val normalizedRegisteredSubgroup = registeredSubgroup.normalizeSubgroup()
             ?: return week
 

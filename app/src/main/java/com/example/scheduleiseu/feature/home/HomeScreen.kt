@@ -39,6 +39,7 @@ import com.example.scheduleiseu.core.ui.animation.appAnimatedContentSize
 import com.example.scheduleiseu.core.ui.animation.appRevealMotion
 import com.example.scheduleiseu.domain.core.model.Lesson
 import com.example.scheduleiseu.domain.core.model.ScheduleDay
+import com.example.scheduleiseu.domain.core.model.shouldUseMidGreenLessonTypeBadge
 import com.example.scheduleiseu.domain.core.model.toFormattedLessonTypeLabel
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -49,6 +50,8 @@ fun HomeScreen(
     onResetTemporaryContextClick: () -> Unit = {},
     onScreenSettingsClick: () -> Unit = {},
     onDayClick: (String) -> Unit = {},
+    onNextWeekSwipe: () -> Unit = {},
+    onPreviousWeekSwipe: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     ScheduleHomeScaffold(
@@ -57,6 +60,8 @@ fun HomeScreen(
         onScreenSettingsClick = onScreenSettingsClick,
         selectedDay = state.selectedDay,
         isTemporaryContext = state.isTemporaryContext,
+        onNextWeekSwipe = onNextWeekSwipe,
+        onPreviousWeekSwipe = onPreviousWeekSwipe,
         modifier = modifier,
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
@@ -135,6 +140,8 @@ private fun LessonCard(
     val subgroupLine = lesson.subgroup.orEmpty().trim().toSubgroupDisplayText()
     val lessonType = lesson.type.toFormattedLessonTypeLabel()
     val hasLessonType = !lessonType.isNullOrBlank()
+    val lessonTypeBadgeColor =
+        if (lesson.type.shouldUseMidGreenLessonTypeBadge()) AppColors.MidGreen else AppColors.White
     val contentTopPadding = if (hasLessonType) 36.dp else 12.dp
 
     PressScale(
@@ -159,7 +166,7 @@ private fun LessonCard(
                     Box(
                         modifier = Modifier
                             .align(Alignment.TopCenter)
-                            .background(color = AppColors.White, shape = AppShapes.medium)
+                            .background(color = lessonTypeBadgeColor, shape = AppShapes.medium)
                             .padding(horizontal = 14.dp, vertical = 4.dp),
                         contentAlignment = Alignment.Center,
                     ) {

@@ -4,8 +4,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -33,6 +37,7 @@ internal fun ScheduleStatusBanner(
         }
         else -> null
     }
+    val showLoadingIndicator = state.isLoading && !state.isOfflineMode
 
     FadeSlideVisibility(visible = message != null, modifier = modifier) {
         Row(
@@ -53,6 +58,14 @@ internal fun ScheduleStatusBanner(
             horizontalArrangement = Arrangement.Start,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            if (showLoadingIndicator) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    color = AppColors.White,
+                    strokeWidth = 2.dp
+                )
+                Spacer(modifier = Modifier.width(AppSpacing.sm))
+            }
             Text(
                 text = message.orEmpty(),
                 color = AppColors.White,

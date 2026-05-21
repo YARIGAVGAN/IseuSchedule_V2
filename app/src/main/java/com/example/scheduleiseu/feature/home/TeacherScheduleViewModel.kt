@@ -59,6 +59,20 @@ class TeacherScheduleViewModel(
         loadWeek(week)
     }
 
+    fun onNextWeekRequested() {
+        findAdjacentWeek(step = 1)?.let { week ->
+            resetManualDaySelection(week)
+            loadWeek(week)
+        }
+    }
+
+    fun onPreviousWeekRequested() {
+        findAdjacentWeek(step = -1)?.let { week ->
+            resetManualDaySelection(week)
+            loadWeek(week)
+        }
+    }
+
     fun onDayClick(dayDate: String) {
         val day = _state.value.days.firstOrNull { it.date == dayDate } ?: return
         _state.value.selectedWeek?.value?.let { weekValue -> manuallySelectedDayByWeekValue[weekValue] = day.date }
@@ -372,5 +386,16 @@ class TeacherScheduleViewModel(
 
     private fun String.removeCachedWeekMarker(): String {
         return removeSuffix(" +").trim()
+    }
+
+    private fun findAdjacentWeek(step: Int): WeekInfo? {
+        val weeks = _state.value.availableWeeks
+        if (weeks.isEmpty()) return null
+
+        val selectedWeekValue = _state.value.selectedWeek?.value ?: return null
+        val currentIndex = weeks.indexOfFirst { it.value == selectedWeekValue }
+        if (currentIndex == -1) return null
+
+        return weeks.getOrNull(currentIndex + step)
     }
 }

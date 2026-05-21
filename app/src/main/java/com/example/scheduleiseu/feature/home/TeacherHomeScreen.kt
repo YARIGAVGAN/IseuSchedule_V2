@@ -25,6 +25,8 @@ fun TeacherHomeScreen(
     onMenuClick: () -> Unit = {},
     onScreenSettingsClick: () -> Unit = {},
     onDayClick: (String) -> Unit = {},
+    onNextWeekSwipe: () -> Unit = {},
+    onPreviousWeekSwipe: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     ScheduleHomeScaffold(
@@ -32,6 +34,8 @@ fun TeacherHomeScreen(
         onResetTemporaryContextClick = {},
         onScreenSettingsClick = onScreenSettingsClick,
         selectedDay = state.selectedDay,
+        onNextWeekSwipe = onNextWeekSwipe,
+        onPreviousWeekSwipe = onPreviousWeekSwipe,
         modifier = modifier,
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
