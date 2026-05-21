@@ -28,6 +28,10 @@ class PerformanceViewModel(
     private val refreshSemesterPerformance: RefreshSemesterPerformanceUseCase
 ) : ViewModel() {
 
+    private companion object {
+        const val NO_GRADES_LABEL = "нет оценок"
+    }
+
     private val _state = MutableStateFlow(PerformanceUiState())
     val state: StateFlow<PerformanceUiState> = _state.asStateFlow()
 
@@ -199,13 +203,13 @@ class PerformanceViewModel(
         }
 
         val latestAverage = semesterSessions.firstOrNull { it.id == resolvedLatestSemesterId }?.averageScore
-            ?.takeIf { it.isNotBlank() }
-            ?: if (selectedId == resolvedLatestSemesterId) averageScore?.takeIf { it.isNotBlank() } else null
+            .takeMeaningfulAverage()
+            ?: if (selectedId == resolvedLatestSemesterId) averageScore.takeMeaningfulAverage() else null
             ?: semesterSessions
                 .asReversed()
-                .firstNotNullOfOrNull { session -> session.averageScore?.takeIf { it.isNotBlank() } }
-            ?: previousCourse?.averageScore
-            ?: "нет оценок"
+                .firstNotNullOfOrNull { session -> session.averageScore.takeMeaningfulAverage() }
+            ?: previousCourse?.averageScore.takeMeaningfulAverage()
+            ?: NO_GRADES_LABEL
 
         return Course(
             id = "student-performance",
@@ -239,5 +243,14 @@ class PerformanceViewModel(
             typeLabel = controlType,
             grade = result
         )
+    }
+
+    private fun String?.takeMeaningfulAverage(): String? {
+        val normalized = this?.trim().orEmpty()
+        return normalized.takeIf {
+            it.isNotBlank() &&
+                !it.equals("null", ignoreCase = true) &&
+                !it.equals(NO_GRADES_LABEL, ignoreCase = true)
+        }
     }
 }
