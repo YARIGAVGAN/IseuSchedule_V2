@@ -523,6 +523,7 @@ class BsuParser(
 
     private fun extractGrade(value: String): String? {
         val cleaned = value.trim()
+
         val match = Regex("""\b([0-9]|10)\b""").find(cleaned)
         return match?.groupValues?.get(1)
     }
