@@ -32,4 +32,7 @@ interface PerformanceCacheDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: CachedPerformanceEntity)
+
+    @Query("DELETE FROM cached_performance")
+    suspend fun deleteAll()
 }

@@ -105,6 +105,11 @@ class StudentRegistrationRepositoryImpl(
     override fun getSavedStudentProfile(): StudentProfile? =
         sessionStore.getSavedProfile() ?: preferencesDataSource?.getStudentProfileBlocking()
 
+    override suspend fun clearSavedStudentProfile() {
+        sessionStore.clearAll()
+        preferencesDataSource?.clearStudentProfileForLogout()
+    }
+
     private fun requireRawState(): TimeTableData {
         return sessionStore.getRawState()
             ?: throw IllegalStateException("Состояние регистрации не инициализировано")

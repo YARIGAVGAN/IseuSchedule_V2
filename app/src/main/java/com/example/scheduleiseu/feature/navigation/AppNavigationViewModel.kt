@@ -7,7 +7,10 @@ import com.example.scheduleiseu.domain.core.model.AuthSession
 import com.example.scheduleiseu.domain.core.model.UserRole
 import com.example.scheduleiseu.domain.core.network.NetworkMonitor
 import com.example.scheduleiseu.domain.core.repository.AuthRepository
+import com.example.scheduleiseu.domain.core.repository.PerformanceRepository
+import com.example.scheduleiseu.domain.core.repository.ProfileRepository
 import com.example.scheduleiseu.domain.core.repository.ScheduleRepository
+import com.example.scheduleiseu.domain.core.repository.StudentRegistrationRepository
 import com.example.scheduleiseu.domain.core.repository.TeacherRegistrationRepository
 import com.example.scheduleiseu.domain.core.service.CaptchaRecognizer
 import com.example.scheduleiseu.domain.core.usecase.BackgroundRefreshResult
@@ -29,8 +32,11 @@ import kotlinx.coroutines.launch
 class AppNavigationViewModel(
     private val preferencesDataSource: AppPreferencesDataSource,
     private val authRepository: AuthRepository,
+    private val studentRegistrationRepository: StudentRegistrationRepository,
     private val teacherRegistrationRepository: TeacherRegistrationRepository,
     private val scheduleRepository: ScheduleRepository,
+    private val performanceRepository: PerformanceRepository,
+    private val profileRepository: ProfileRepository,
     private val firstEntryBootstrapUseCase: FirstEntryBootstrapUseCase,
     private val backgroundRefreshUseCase: BackgroundRefreshUseCase,
     private val networkMonitor: NetworkMonitor,
@@ -759,11 +765,19 @@ class AppNavigationViewModel(
             }
 
             val logoutResult = runCatching {
+                authRepository.clearActiveSession()
+                studentRegistrationRepository.clearSavedStudentProfile()
                 teacherRegistrationRepository.clearSavedTeacherProfile()
                 scheduleRepository.clearTeacherSessionState()
-                authRepository.clearActiveSession()
-                preferencesDataSource.setStudentScheduleOnlyModeEnabled(false)
+                scheduleRepository.clearAllCachedScheduleWeeks()
+                performanceRepository.clearCachedPerformance()
+                profileRepository.clearCachedUserPhotos()
+                preferencesDataSource.resetStudentBootstrap()
+                preferencesDataSource.clearStudentCredentials()
+                preferencesDataSource.clearSessionFlagsForLogout()
+                preferencesDataSource.setLessonNotificationsEnabled(false)
                 preferencesDataSource.setUserRole(UserRole.STUDENT)
+                lessonNotificationScheduler.cancelAll()
             }
 
             _state.update {
@@ -800,11 +814,22 @@ class AppNavigationViewModel(
             val logoutResult = runCatching {
                 if (_state.value.isStudentScheduleOnlyMode) {
                     authRepository.clearActiveSession()
-                    preferencesDataSource.clearStudentScheduleOnlyMode()
-                    preferencesDataSource.setUserRole(UserRole.STUDENT)
                 } else {
-                    authRepository.logout()
+                    runCatching { authRepository.logout() }
+                    authRepository.clearActiveSession()
                 }
+                studentRegistrationRepository.clearSavedStudentProfile()
+                teacherRegistrationRepository.clearSavedTeacherProfile()
+                scheduleRepository.clearTeacherSessionState()
+                scheduleRepository.clearAllCachedScheduleWeeks()
+                performanceRepository.clearCachedPerformance()
+                profileRepository.clearCachedUserPhotos()
+                preferencesDataSource.resetStudentBootstrap()
+                preferencesDataSource.clearStudentCredentials()
+                preferencesDataSource.clearSessionFlagsForLogout()
+                preferencesDataSource.setLessonNotificationsEnabled(false)
+                preferencesDataSource.setUserRole(UserRole.STUDENT)
+                lessonNotificationScheduler.cancelAll()
             }
             val logoutError = logoutResult.exceptionOrNull()?.message
             _state.update {

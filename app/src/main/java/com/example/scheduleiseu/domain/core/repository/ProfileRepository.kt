@@ -15,4 +15,5 @@ interface ProfileRepository {
     suspend fun refreshStudentProfile(session: AuthSession): StudentProfile
     suspend fun refreshTeacherProfile(session: AuthSession): TeacherProfile
     suspend fun refreshUserPhoto(session: AuthSession): UserPhoto?
+    suspend fun clearCachedUserPhotos()
 }

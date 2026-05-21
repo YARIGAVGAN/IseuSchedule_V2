@@ -496,12 +496,14 @@ class BsuParser(
 
         val zachIsPass = isPass(zachValue)
         val examHasGrade = examGrade != null
+        val examIsDeclared = isExam(examValue)
 
         return when {
             zachGrade != null -> "Диф. зачет" to zachGrade
             zachIsPass && examHasGrade -> "Диф. зачет" to examGrade
             zachIsPass && !examHasGrade -> "Зачет" to "+"
             !zachIsPass && examHasGrade -> "Экзамен" to examGrade
+            !zachIsPass && examIsDeclared -> "Экзамен" to ""
             else -> null
         }
     }
@@ -533,6 +535,14 @@ class BsuParser(
         return normalized == "+" ||
             normalized.contains("зачтено") ||
             normalized == "зачет"
+    }
+
+    private fun isExam(value: String): Boolean {
+        val normalized = value.trim().lowercase()
+        return normalized == "экзамен" ||
+            normalized == "экз." ||
+            normalized == "экз" ||
+            normalized.contains("экзам")
     }
 
 }

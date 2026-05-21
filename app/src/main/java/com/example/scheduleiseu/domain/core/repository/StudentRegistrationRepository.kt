@@ -11,4 +11,5 @@ interface StudentRegistrationRepository {
     suspend fun selectGroup(groupId: String): StudentRegistrationContext
     suspend fun saveStudentProfile(fullName: String, subgroup: String): StudentProfile
     fun getSavedStudentProfile(): StudentProfile?
+    suspend fun clearSavedStudentProfile()
 }

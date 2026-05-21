@@ -115,6 +115,10 @@ class PerformanceRepositoryImpl(
         performance
     }
 
+    override suspend fun clearCachedPerformance() {
+        performanceCacheDao?.deleteAll()
+    }
+
     private suspend fun cachePerformance(performance: SemesterPerformance) {
         performanceCacheDao?.upsert(
             PerformanceCacheCodec.toEntity(

@@ -245,6 +245,25 @@ class AppPreferencesDataSource(
     }
 
     fun getTeacherProfileBlocking(): TeacherProfile? = runBlocking { getTeacherProfile() }
+
+    suspend fun clearStudentProfileForLogout() {
+        dataStore.edit { preferences ->
+            preferences.remove(Keys.STUDENT_FULL_NAME)
+            preferences.remove(Keys.STUDENT_LOGIN)
+            preferences.remove(Keys.STUDENT_FACULTY_ID)
+            preferences.remove(Keys.STUDENT_FACULTY)
+            preferences.remove(Keys.STUDENT_DEPARTMENT_ID)
+            preferences.remove(Keys.STUDENT_DEPARTMENT)
+            preferences.remove(Keys.STUDENT_COURSE_ID)
+            preferences.remove(Keys.STUDENT_COURSE)
+            preferences.remove(Keys.STUDENT_GROUP_ID)
+            preferences.remove(Keys.STUDENT_GROUP)
+            preferences.remove(Keys.STUDENT_SUBGROUP)
+            preferences.remove(Keys.STUDENT_AVERAGE_SCORE)
+            preferences[Keys.STUDENT_REGISTRATION_COMPLETED] = false
+        }
+    }
+
     suspend fun clearTeacherProfileForLogout() {
         dataStore.edit { preferences ->
             preferences.remove(Keys.TEACHER_FULL_NAME)

@@ -109,6 +109,13 @@ class ProfileRepositoryImpl(
         }
     }
 
+    override suspend fun clearCachedUserPhotos() {
+        photoCacheDataSource?.clearAll()
+        UserRole.entries.forEach { role ->
+            photoCacheEvents.tryEmit(role)
+        }
+    }
+
     private fun StudentProfile.mergeWithSavedRegistrationProfile(
         savedProfile: StudentProfile?
     ): StudentProfile {

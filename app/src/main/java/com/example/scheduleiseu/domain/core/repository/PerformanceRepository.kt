@@ -17,4 +17,6 @@ interface PerformanceRepository {
         semesterId: String,
         semesterTitle: String
     ): SemesterPerformance
+
+    suspend fun clearCachedPerformance()
 }

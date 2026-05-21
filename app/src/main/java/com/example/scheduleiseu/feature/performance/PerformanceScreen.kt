@@ -346,7 +346,7 @@ private fun SubjectCard(
             )
 
             Text(
-                text = subject.grade,
+                text = subject.grade.ifBlank { "—" },
                 style = MaterialTheme.typography.titleMedium.copy(color = AppColors.GradeGreen),
             )
         }

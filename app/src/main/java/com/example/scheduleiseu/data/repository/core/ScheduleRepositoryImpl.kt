@@ -271,6 +271,9 @@ class ScheduleRepositoryImpl(
 
     override suspend fun clearAllCachedScheduleWeeks() {
         scheduleCacheDao?.deleteAllWeeksForRole(ROLE_STUDENT)
+        scheduleCacheDao?.deleteAllWeeksForRole(ROLE_TEACHER)
+        sessionStore.clearStudentRawState()
+        sessionStore.clearTeacherRawState()
     }
 
     private suspend fun requireStudentStateOrLoad(): TimeTableData {

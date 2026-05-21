@@ -23,4 +23,9 @@ class StudentRegistrationSessionStore {
     fun saveProfile(profile: StudentProfile) {
         profileRef.set(profile)
     }
+
+    fun clearAll() {
+        rawStateRef.set(null)
+        profileRef.set(null)
+    }
 }

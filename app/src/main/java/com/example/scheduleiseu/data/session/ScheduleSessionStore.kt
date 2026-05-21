@@ -14,6 +14,10 @@ class ScheduleSessionStore {
         studentStateRef.set(state)
     }
 
+    fun clearStudentRawState() {
+        studentStateRef.set(null)
+    }
+
     fun getTeacherRawState(): TeacherTimeTableData? = teacherStateRef.get()
 
     fun saveTeacherRawState(state: TeacherTimeTableData) {

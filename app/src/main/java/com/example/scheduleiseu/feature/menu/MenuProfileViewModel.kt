@@ -37,6 +37,11 @@ class MenuProfileViewModel(
     private val isStudentScheduleOnlyModeProvider: () -> Boolean
 ) : ViewModel() {
 
+    private companion object {
+        const val FULL_INSTITUTION_TITLE =
+            "Учреждение образования \"Международный государственный экологический институт им. А.Д. Сахарова БГУ\""
+    }
+
     private val _state = MutableStateFlow(MenuProfileUiState())
     val state: StateFlow<MenuProfileUiState> = _state.asStateFlow()
 
@@ -203,7 +208,7 @@ class MenuProfileViewModel(
             role = if (isScheduleOnly) "Студент" else "Студент",
             isTeacherMode = false,
             isScheduleOnlyMode = isScheduleOnly,
-            groupOrPosition = faculty ?: "БГУ",
+            groupOrPosition = faculty.normalizeInstitutionTitle(),
             details = if (isScheduleOnly) "$info • режим без регистрации" else info,
             averageScore = if (isScheduleOnly) null else latestSemesterAverageScore ?: averageScore,
             photoBitmap = null,
@@ -218,13 +223,27 @@ class MenuProfileViewModel(
             role = "Преподаватель",
             isTeacherMode = true,
             isScheduleOnlyMode = false,
-            groupOrPosition = department ?: faculty ?: "БГУ",
-            details = listOfNotNull(faculty, department).distinct().joinToString(" • ").ifBlank { "Преподаватель" },
+            groupOrPosition = (department ?: faculty).normalizeInstitutionTitle(),
+            details = listOfNotNull(faculty, department)
+                .map { it.normalizeInstitutionTitle() }
+                .distinct()
+                .joinToString(" • ")
+                .ifBlank { "Преподаватель" },
             averageScore = null,
             photoBitmap = null,
             isPhotoLoading = false,
             showPhoto = false
         )
+    }
+
+    private fun String?.normalizeInstitutionTitle(): String {
+        val normalized = this?.trim().orEmpty()
+        return when {
+            normalized.isBlank() -> FULL_INSTITUTION_TITLE
+            normalized.contains("международный", ignoreCase = true) &&
+                normalized.contains("эколог", ignoreCase = true) -> FULL_INSTITUTION_TITLE
+            else -> normalized
+        }
     }
 
     private fun UserPhoto.toBitmapOrNull() = bytes.toBitmapOrNull()

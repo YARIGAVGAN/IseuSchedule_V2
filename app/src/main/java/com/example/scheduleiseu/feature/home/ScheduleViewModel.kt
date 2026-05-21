@@ -87,6 +87,10 @@ class ScheduleViewModel(
         loadInitialSchedule(ScheduleLoadingStage.Initial)
     }
 
+    fun refreshSchedule() {
+        loadInitialSchedule(ScheduleLoadingStage.Initial)
+    }
+
     fun onWeekSelected(weekTitle: String) {
         val normalizedTitle = weekTitle.removeCachedWeekMarker()
         val week = _state.value.availableWeeks.firstOrNull { it.title == normalizedTitle } ?: return

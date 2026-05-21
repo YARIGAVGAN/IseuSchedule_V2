@@ -20,7 +20,9 @@ import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,7 +44,7 @@ import com.example.scheduleiseu.domain.core.model.ScheduleDay
 import com.example.scheduleiseu.domain.core.model.shouldUseMidGreenLessonTypeBadge
 import com.example.scheduleiseu.domain.core.model.toFormattedLessonTypeLabel
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     state: ScheduleUiState,
@@ -52,6 +54,7 @@ fun HomeScreen(
     onDayClick: (String) -> Unit = {},
     onNextWeekSwipe: () -> Unit = {},
     onPreviousWeekSwipe: () -> Unit = {},
+    onRefresh: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     ScheduleHomeScaffold(
@@ -64,48 +67,54 @@ fun HomeScreen(
         onPreviousWeekSwipe = onPreviousWeekSwipe,
         modifier = modifier,
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            LazyColumn(contentPadding = PaddingValues(bottom = AppSpacing.lg)) {
-                scheduleStickyHeader(
-                    days = state.days,
-                    selectedDay = state.selectedDay,
-                    onDayClick = onDayClick,
-                )
-                if (state.errorMessage != null && state.days.isEmpty()) {
-                    item(key = "empty-error") {
-                        EmptyScheduleMessage(
-                            message = state.errorMessage,
-                            modifier = Modifier.padding(top = AppSpacing.lg)
-                        )
+        PullToRefreshBox(
+            isRefreshing = state.isLoading && state.days.isNotEmpty(),
+            onRefresh = onRefresh,
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                LazyColumn(contentPadding = PaddingValues(bottom = AppSpacing.lg)) {
+                    scheduleStickyHeader(
+                        days = state.days,
+                        selectedDay = state.selectedDay,
+                        onDayClick = onDayClick,
+                    )
+                    if (state.errorMessage != null && state.days.isEmpty()) {
+                        item(key = "empty-error") {
+                            EmptyScheduleMessage(
+                                message = state.errorMessage,
+                                modifier = Modifier.padding(top = AppSpacing.lg)
+                            )
+                        }
+                    }
+                    item { ScheduleStatusBanner(state = state) }
+                    val isTeacherScheduleView =
+                        state.isTemporaryContext &&
+                                (
+                                        !state.selectedTeacherName.isNullOrBlank() ||
+                                                state.scheduleContext?.selectedTeacherId != null
+                                        )
+                    items(
+                        items = state.lessonsForSelectedDay,
+                        key = { lesson -> "${state.selectedDay?.date.orEmpty()}_${lesson.id}" }
+                    ) { lesson ->
+                        if (isTeacherScheduleView) {
+                            TeacherLessonCard(
+                                lesson = lesson,
+                                modifier = Modifier.padding(top = AppSpacing.md),
+                            )
+                        } else {
+                            LessonCard(
+                                lesson = lesson,
+                                modifier = Modifier.padding(top = AppSpacing.md),
+                            )
+                        }
                     }
                 }
-                item { ScheduleStatusBanner(state = state) }
-                val isTeacherScheduleView =
-                    state.isTemporaryContext &&
-                            (
-                                    !state.selectedTeacherName.isNullOrBlank() ||
-                                            state.scheduleContext?.selectedTeacherId != null
-                                    )
-                items(
-                    items = state.lessonsForSelectedDay,
-                    key = { lesson -> "${state.selectedDay?.date.orEmpty()}_${lesson.id}" }
-                ) { lesson ->
-                    if (isTeacherScheduleView) {
-                        TeacherLessonCard(
-                            lesson = lesson,
-                            modifier = Modifier.padding(top = AppSpacing.md),
-                        )
-                    } else {
-                        LessonCard(
-                            lesson = lesson,
-                            modifier = Modifier.padding(top = AppSpacing.md),
-                        )
-                    }
-                }
-            }
 
-            if (state.isLoading && state.days.isEmpty()) {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                if (state.isLoading && state.days.isEmpty()) {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                }
             }
         }
     }
@@ -140,8 +149,11 @@ private fun LessonCard(
     val subgroupLine = lesson.subgroup.orEmpty().trim().toSubgroupDisplayText()
     val lessonType = lesson.type.toFormattedLessonTypeLabel()
     val hasLessonType = !lessonType.isNullOrBlank()
+    val isSpecialLessonType = lesson.type.shouldUseMidGreenLessonTypeBadge()
     val lessonTypeBadgeColor =
-        if (lesson.type.shouldUseMidGreenLessonTypeBadge()) AppColors.MidGreen else AppColors.White
+        if (isSpecialLessonType) AppColors.DarkGreen else AppColors.White
+    val lessonTypeTextColor =
+        if (isSpecialLessonType) AppColors.White else AppColors.Black
     val contentTopPadding = if (hasLessonType) 36.dp else 12.dp
 
     PressScale(
@@ -173,7 +185,7 @@ private fun LessonCard(
                         TextLine(
                             text = lessonType.orEmpty(),
                             fontSize = 16.sp,
-                            color = AppColors.Black,
+                            color = lessonTypeTextColor,
                             modifier = Modifier.wrapContentWidth(),
                         )
                     }

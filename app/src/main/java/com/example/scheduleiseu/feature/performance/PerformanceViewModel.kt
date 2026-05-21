@@ -199,7 +199,11 @@ class PerformanceViewModel(
         }
 
         val latestAverage = semesterSessions.firstOrNull { it.id == resolvedLatestSemesterId }?.averageScore
-            ?: if (selectedId == resolvedLatestSemesterId) averageScore else null
+            ?.takeIf { it.isNotBlank() }
+            ?: if (selectedId == resolvedLatestSemesterId) averageScore?.takeIf { it.isNotBlank() } else null
+            ?: semesterSessions
+                .asReversed()
+                .firstNotNullOfOrNull { session -> session.averageScore?.takeIf { it.isNotBlank() } }
             ?: previousCourse?.averageScore
             ?: "нет оценок"
 

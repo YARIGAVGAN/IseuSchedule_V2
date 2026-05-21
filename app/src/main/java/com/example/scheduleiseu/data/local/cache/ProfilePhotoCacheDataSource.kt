@@ -57,6 +57,13 @@ class ProfilePhotoCacheDataSource(
         metadataFile(role).delete()
     }
 
+    suspend fun clearAll() = withContext(Dispatchers.IO) {
+        UserRole.entries.forEach { role ->
+            photoFile(role).delete()
+            metadataFile(role).delete()
+        }
+    }
+
     private fun photoFile(role: UserRole): File {
         return File(cacheDir, "${role.name.lowercase()}_photo.bin")
     }

@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -18,7 +20,7 @@ import com.example.scheduleiseu.core.designsystem.theme.ScheduleIsEuTheme
 import com.example.scheduleiseu.domain.core.model.Lesson
 import com.example.scheduleiseu.domain.core.model.ScheduleDay
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun TeacherHomeScreen(
     state: ScheduleUiState,
@@ -27,6 +29,7 @@ fun TeacherHomeScreen(
     onDayClick: (String) -> Unit = {},
     onNextWeekSwipe: () -> Unit = {},
     onPreviousWeekSwipe: () -> Unit = {},
+    onRefresh: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     ScheduleHomeScaffold(
@@ -38,35 +41,41 @@ fun TeacherHomeScreen(
         onPreviousWeekSwipe = onPreviousWeekSwipe,
         modifier = modifier,
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            LazyColumn(contentPadding = PaddingValues(bottom = AppSpacing.lg)) {
-                scheduleStickyHeader(
-                    days = state.days,
-                    selectedDay = state.selectedDay,
-                    onDayClick = onDayClick
-                )
-                if (state.errorMessage != null && state.days.isEmpty()) {
-                    item(key = "empty-error") {
-                        EmptyScheduleMessage(
-                            message = state.errorMessage,
-                            modifier = Modifier.padding(top = AppSpacing.lg)
+        PullToRefreshBox(
+            isRefreshing = state.isLoading && state.days.isNotEmpty(),
+            onRefresh = onRefresh,
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                LazyColumn(contentPadding = PaddingValues(bottom = AppSpacing.lg)) {
+                    scheduleStickyHeader(
+                        days = state.days,
+                        selectedDay = state.selectedDay,
+                        onDayClick = onDayClick
+                    )
+                    if (state.errorMessage != null && state.days.isEmpty()) {
+                        item(key = "empty-error") {
+                            EmptyScheduleMessage(
+                                message = state.errorMessage,
+                                modifier = Modifier.padding(top = AppSpacing.lg)
+                            )
+                        }
+                    }
+                    item { ScheduleStatusBanner(state = state) }
+                    items(
+                        items = state.lessonsForSelectedDay,
+                        key = { lesson -> "${state.selectedDay?.date.orEmpty()}_${lesson.id}" }
+                    ) { lesson ->
+                        TeacherLessonCard(
+                            lesson = lesson,
+                            modifier = Modifier.padding(horizontal = AppSpacing.md, vertical = AppSpacing.xs),
                         )
                     }
                 }
-                item { ScheduleStatusBanner(state = state) }
-                items(
-                    items = state.lessonsForSelectedDay,
-                    key = { lesson -> "${state.selectedDay?.date.orEmpty()}_${lesson.id}" }
-                ) { lesson ->
-                    TeacherLessonCard(
-                        lesson = lesson,
-                        modifier = Modifier.padding(horizontal = AppSpacing.md, vertical = AppSpacing.xs),
-                    )
-                }
-            }
 
-            if (state.isLoading && state.days.isEmpty()) {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                if (state.isLoading && state.days.isEmpty()) {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                }
             }
         }
     }
