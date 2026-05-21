@@ -39,7 +39,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
@@ -60,6 +59,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.scheduleiseu.R
 import com.example.scheduleiseu.core.designsystem.components.AppCard
+import com.example.scheduleiseu.core.designsystem.components.AppFieldLabel
 import com.example.scheduleiseu.core.designsystem.components.AppSettingsSwitch
 import com.example.scheduleiseu.core.designsystem.theme.AppColors
 import com.example.scheduleiseu.core.designsystem.theme.AppDimens
@@ -293,7 +293,6 @@ private fun AuthTextField(
     trailingIcon: @Composable (() -> Unit)? = null
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val isFocused by interactionSource.collectIsFocusedAsState()
 
     OutlinedTextField(
         value = value,
@@ -303,14 +302,7 @@ private fun AuthTextField(
         singleLine = true,
         interactionSource = interactionSource,
         textStyle = MaterialTheme.typography.bodyMedium.copy(color = AppColors.FieldText),
-        placeholder = {
-            if (!isFocused && value.isBlank()) {
-                Text(
-                    text = label,
-                    color = AppColors.FieldText
-                )
-            }
-        },
+        label = { AppFieldLabel(text = label) },
         keyboardOptions = keyboardOptions,
         visualTransformation = visualTransformation,
         trailingIcon = trailingIcon,
@@ -325,9 +317,9 @@ private fun AuthTextField(
             focusedBorderColor = AppColors.LightGreen,
             unfocusedBorderColor = AppColors.FieldBorder,
             disabledBorderColor = AppColors.FieldBorder.copy(alpha = 0.6f),
-            focusedPlaceholderColor = AppColors.FieldText,
-            unfocusedPlaceholderColor = AppColors.FieldText,
-            disabledPlaceholderColor = AppColors.FieldText.copy(alpha = 0.45f),
+            focusedLabelColor = AppColors.Black,
+            unfocusedLabelColor = AppColors.Black,
+            disabledLabelColor = AppColors.Black.copy(alpha = 0.55f),
             cursorColor = AppColors.LightGreen
         )
     )

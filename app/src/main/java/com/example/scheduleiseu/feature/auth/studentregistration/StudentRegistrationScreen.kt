@@ -45,6 +45,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.scheduleiseu.R
 import com.example.scheduleiseu.core.designsystem.components.AppCard
+import com.example.scheduleiseu.core.designsystem.components.AppFieldLabel
 import com.example.scheduleiseu.core.designsystem.theme.AppColors
 import com.example.scheduleiseu.core.designsystem.theme.AppDimens
 import com.example.scheduleiseu.core.designsystem.theme.AppShapes
@@ -257,7 +258,7 @@ private fun RegistrationTextField(
         singleLine = true,
         shape = AppShapes.extraLarge,
         textStyle = MaterialTheme.typography.bodyMedium.copy(color = AppColors.FieldText),
-        label = { Text(text = label, style = MaterialTheme.typography.bodySmall, color = AppColors.FieldText.copy(alpha = 0.82f)) },
+        label = { AppFieldLabel(text = label) },
         colors = outlinedFieldColors()
     )
 }
@@ -364,9 +365,9 @@ private fun outlinedFieldColors() = OutlinedTextFieldDefaults.colors(
     focusedBorderColor = AppColors.LightGreen,
     unfocusedBorderColor = AppColors.FieldBorder,
     disabledBorderColor = AppColors.FieldBorder.copy(alpha = 0.6f),
-    focusedLabelColor = AppColors.FieldText.copy(alpha = 0.82f),
-    unfocusedLabelColor = AppColors.FieldText.copy(alpha = 0.7f),
-    disabledLabelColor = AppColors.FieldText.copy(alpha = 0.45f),
+    focusedLabelColor = AppColors.Black,
+    unfocusedLabelColor = AppColors.Black,
+    disabledLabelColor = AppColors.Black.copy(alpha = 0.55f),
     focusedTrailingIconColor = AppColors.FieldText,
     unfocusedTrailingIconColor = AppColors.FieldText.copy(alpha = 0.75f),
     disabledTrailingIconColor = AppColors.FieldText.copy(alpha = 0.45f),

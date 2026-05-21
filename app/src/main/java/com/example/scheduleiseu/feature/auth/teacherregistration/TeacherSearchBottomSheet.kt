@@ -41,6 +41,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.example.scheduleiseu.core.designsystem.components.AppFieldLabel
 import com.example.scheduleiseu.core.designsystem.theme.AppColors
 import com.example.scheduleiseu.core.designsystem.theme.AppDimens
 import com.example.scheduleiseu.core.designsystem.theme.AppShapes
@@ -115,7 +116,7 @@ private fun TeacherSearchField(value: String, onValueChange: (String) -> Unit) {
         singleLine = true,
         shape = AppShapes.extraLarge,
         textStyle = MaterialTheme.typography.bodyMedium.copy(color = AppColors.FieldText),
-        label = { Text(text = "Имя преподавателя", style = MaterialTheme.typography.bodySmall) },
+        label = { AppFieldLabel(text = "Имя преподавателя") },
         placeholder = {
             Text(
                 text = "Например, Иванов Иван Иванович",
@@ -134,8 +135,8 @@ private fun TeacherSearchField(value: String, onValueChange: (String) -> Unit) {
             unfocusedContainerColor = AppColors.FieldSurface,
             focusedBorderColor = AppColors.LightGreen,
             unfocusedBorderColor = AppColors.FieldBorder,
-            focusedLabelColor = AppColors.ScreenTextSecondary,
-            unfocusedLabelColor = AppColors.ScreenTextSecondary,
+            focusedLabelColor = AppColors.Black,
+            unfocusedLabelColor = AppColors.Black,
             cursorColor = AppColors.LightGreen
         )
     )
