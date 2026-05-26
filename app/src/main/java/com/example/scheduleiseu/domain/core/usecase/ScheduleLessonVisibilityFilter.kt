@@ -26,13 +26,13 @@ class ScheduleLessonVisibilityFilter {
         showMismatchedSubgroupLessons: Boolean
     ): ScheduleWeek {
         if (showMismatchedSubgroupLessons) return week
-        val normalizedRegisteredSubgroup = registeredSubgroup.normalizeSubgroup()
+        val normalizedRegisteredSubgroup = ScheduleLessonFilterRules.normalizeSubgroup(registeredSubgroup)
             ?: return week
 
         val filteredDays = week.days.map { day ->
             day.copy(
                 lessons = day.lessons.filter { lesson ->
-                    val lessonSubgroup = lesson.subgroup.normalizeSubgroup()
+                    val lessonSubgroup = ScheduleLessonFilterRules.normalizeSubgroup(lesson.subgroup)
 
                     lessonSubgroup == null || lessonSubgroup == normalizedRegisteredSubgroup
                 }
@@ -40,30 +40,5 @@ class ScheduleLessonVisibilityFilter {
         }
 
         return week.copy(days = filteredDays)
-    }
-
-    private fun String?.normalizeSubgroup(): String? {
-        val normalized = this
-            ?.replace('\u00A0', ' ')
-            ?.replace(Regex("\\s+"), " ")
-            ?.trim()
-            .orEmpty()
-
-        if (normalized.isBlank()) return null
-        if (normalized == "1" || normalized == "2") return normalized
-
-        explicitSubgroupPatterns.forEach { pattern ->
-            val match = pattern.matchEntire(normalized) ?: return@forEach
-            return match.groupValues.getOrNull(1)?.takeIf { it == "1" || it == "2" }
-        }
-
-        return null
-    }
-
-    private companion object {
-        val explicitSubgroupPatterns = listOf(
-            Regex("""(?i)([12])\s*(?:п\s*/\s*гр|п\.?\s*гр|подгр\.?|подгруппа)"""),
-            Regex("""(?i)(?:п\s*/\s*гр|п\.?\s*гр|подгр\.?|подгруппа)\s*([12])""")
-        )
     }
 }

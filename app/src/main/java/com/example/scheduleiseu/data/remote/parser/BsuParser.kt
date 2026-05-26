@@ -1,18 +1,26 @@
 package com.example.scheduleiseu.data.remote.parser
 
 import com.example.scheduleiseu.data.remote.cookie.MemoryCookieJar
-import com.example.scheduleiseu.data.remote.model.CabinetMenuLink
 import com.example.scheduleiseu.data.remote.model.LoginPageData
 import com.example.scheduleiseu.data.remote.model.LoginResult
 import com.example.scheduleiseu.data.remote.model.ProfileData
-import com.example.scheduleiseu.data.remote.model.ProgressItem
 import com.example.scheduleiseu.data.remote.model.ProgressTableResult
 import com.example.scheduleiseu.data.remote.model.SemesterLink
+import com.example.scheduleiseu.data.remote.parser.cabinet.BsuCabinetConfig
+import com.example.scheduleiseu.data.remote.parser.cabinet.classifyResult
+import com.example.scheduleiseu.data.remote.parser.cabinet.extractCellValue
+import com.example.scheduleiseu.data.remote.parser.cabinet.extractDisplayName
+import com.example.scheduleiseu.data.remote.parser.cabinet.extractEventArgumentFromJsPostBack
+import com.example.scheduleiseu.data.remote.parser.cabinet.extractEventTargetFromJsPostBack
+import com.example.scheduleiseu.data.remote.parser.cabinet.extractLoginError
+import com.example.scheduleiseu.data.remote.parser.cabinet.findAvailableSemesters
+import com.example.scheduleiseu.data.remote.parser.cabinet.isCabinetPage
+import com.example.scheduleiseu.data.remote.parser.cabinet.parseProfileData
+import com.example.scheduleiseu.data.remote.parser.cabinet.parseProgressTable
 import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.jsoup.Jsoup
-import org.jsoup.nodes.Element
 
 class BsuParser(
     private val cookieJar: MemoryCookieJar = MemoryCookieJar(),
@@ -22,19 +30,18 @@ class BsuParser(
         .followSslRedirects(true)
         .build()
 ) {
-
     companion object {
-        const val LOGIN_URL = "https://student.bsu.by/login?ReturnUrl=%2fPersonalCabinet%2fNews"
-        const val STUD_PROGRESS_URL = "https://student.bsu.by/PersonalCabinet/StudProgress"
-        const val CABINET_URL = "https://student.bsu.by/PersonalCabinet/News"
-        const val PHOTO_URL = "https://student.bsu.by/Photo/Photo.aspx"
+        const val LOGIN_URL = BsuCabinetConfig.loginUrl
+        const val STUD_PROGRESS_URL = BsuCabinetConfig.studProgressUrl
+        const val CABINET_URL = BsuCabinetConfig.cabinetUrl
+        const val PHOTO_URL = BsuCabinetConfig.photoUrl
     }
 
     fun loadLoginPage(): LoginPageData {
         val request = Request.Builder()
-            .url(LOGIN_URL)
+            .url(BsuCabinetConfig.loginUrl)
             .get()
-            .header("User-Agent", "Mozilla/5.0")
+            .header("User-Agent", BsuCabinetConfig.userAgent)
             .build()
 
         client.newCall(request).execute().use { response ->
@@ -43,7 +50,7 @@ class BsuParser(
             }
 
             val html = response.body?.string().orEmpty()
-            val doc = Jsoup.parse(html, LOGIN_URL)
+            val doc = Jsoup.parse(html, BsuCabinetConfig.loginUrl)
 
             val viewState = doc.selectFirst("#__VIEWSTATE")?.attr("value").orEmpty()
             val eventValidation = doc.selectFirst("#__EVENTVALIDATION")?.attr("value").orEmpty()
@@ -71,7 +78,7 @@ class BsuParser(
         val request = Request.Builder()
             .url(loginPageData.captchaUrl)
             .get()
-            .header("User-Agent", "Mozilla/5.0")
+            .header("User-Agent", BsuCabinetConfig.userAgent)
             .build()
 
         client.newCall(request).execute().use { response ->
@@ -104,7 +111,7 @@ class BsuParser(
         val request = Request.Builder()
             .url(loginPageData.loginUrl)
             .post(body)
-            .header("User-Agent", "Mozilla/5.0")
+            .header("User-Agent", BsuCabinetConfig.userAgent)
             .header("Content-Type", "application/x-www-form-urlencoded")
             .build()
 
@@ -112,7 +119,7 @@ class BsuParser(
             val html = response.body?.string().orEmpty()
 
             val looksLikeLoginPage =
-                html.contains("Вход в личный кабинет студента", ignoreCase = true) &&
+                html.contains(BsuCabinetConfig.loginTitleMarker, ignoreCase = true) &&
                     (
                         html.contains("ctl00\$ContentPlaceHolder0\$txtUserLogin") ||
                             html.contains("ctl00_ContentPlaceHolder0_txtUserLogin") ||
@@ -131,45 +138,22 @@ class BsuParser(
     }
 
     fun isCabinetPage(html: String): Boolean {
-        val normalized = html.lowercase()
-        val hasCabinetLandingLink = normalized.contains("/personalcabinet/news")
-        val hasCabinetTitle = html.contains("Личный кабинет студента БГУ")
-        val hasDisplayName = extractDisplayName(html) != null
-        val hasCabinetMenu = html.contains("ctl00_ctl00_LoginView1_LoginFIO") ||
-            html.contains("ctl00_ctl00_ContentPlaceHolder0_lbFIO1") ||
-            html.contains("/PersonalCabinet/StudProgress") ||
-            html.contains("/PersonalCabinet/stbd")
-
-        return hasCabinetLandingLink && (hasCabinetTitle || hasDisplayName || hasCabinetMenu)
+        return com.example.scheduleiseu.data.remote.parser.cabinet.isCabinetPage(html)
     }
 
     fun extractDisplayName(html: String): String? {
-        val document = Jsoup.parse(html, CABINET_URL)
-
-        return document.selectFirst("#ctl00_ctl00_LoginView1_LoginFIO")
-            ?.text()
-            ?.trim()
-            ?.takeIf { it.isNotBlank() }
-            ?: document.selectFirst("#ctl00_ctl00_ContentPlaceHolder0_lbFIO1")
-                ?.text()
-                ?.trim()
-                ?.takeIf { it.isNotBlank() }
+        return com.example.scheduleiseu.data.remote.parser.cabinet.extractDisplayName(html)
     }
 
     fun extractLoginError(html: String): String? {
-        val document = Jsoup.parse(html, LOGIN_URL)
-        return document.selectFirst("#ctl00_ContentPlaceHolder0_lbLoginResult")
-            ?.text()
-            ?.replace('\u00A0', ' ')
-            ?.trim()
-            ?.takeIf { it.isNotBlank() }
+        return com.example.scheduleiseu.data.remote.parser.cabinet.extractLoginError(html)
     }
 
     fun getPage(url: String): String {
         val request = Request.Builder()
             .url(url)
             .get()
-            .header("User-Agent", "Mozilla/5.0")
+            .header("User-Agent", BsuCabinetConfig.userAgent)
             .build()
 
         client.newCall(request).execute().use { response ->
@@ -225,7 +209,7 @@ class BsuParser(
         val request = Request.Builder()
             .url(pageUrl)
             .post(bodyBuilder.build())
-            .header("User-Agent", "Mozilla/5.0")
+            .header("User-Agent", BsuCabinetConfig.userAgent)
             .header("Content-Type", "application/x-www-form-urlencoded")
             .build()
 
@@ -238,8 +222,8 @@ class BsuParser(
     }
 
     fun logoutFromCabinet(): Boolean {
-        val pageHtml = runCatching { getPage(CABINET_URL) }.getOrElse { return false }
-        val doc = Jsoup.parse(pageHtml, CABINET_URL)
+        val pageHtml = runCatching { getPage(BsuCabinetConfig.cabinetUrl) }.getOrElse { return false }
+        val doc = Jsoup.parse(pageHtml, BsuCabinetConfig.cabinetUrl)
         val logoutLink = doc.select("a[href^=javascript:__doPostBack]")
             .firstOrNull { link ->
                 val text = link.text().trim().lowercase()
@@ -252,7 +236,7 @@ class BsuParser(
         val eventArgument = extractEventArgumentFromJsPostBack(href) ?: ""
 
         val resultHtml = doPostBack(
-            pageUrl = CABINET_URL,
+            pageUrl = BsuCabinetConfig.cabinetUrl,
             pageHtml = pageHtml,
             eventTarget = eventTarget,
             eventArgument = eventArgument
@@ -262,69 +246,20 @@ class BsuParser(
     }
 
     fun getAvailableSemesters(): List<SemesterLink> {
-        val html = getPage(STUD_PROGRESS_URL)
-        return findAvailableSemesters(html, STUD_PROGRESS_URL)
+        val html = getPage(BsuCabinetConfig.studProgressUrl)
+        return findAvailableSemesters(html, BsuCabinetConfig.studProgressUrl)
     }
     fun findAvailableSemesters(
         pageHtml: String,
-        pageUrl: String = STUD_PROGRESS_URL
+        pageUrl: String = BsuCabinetConfig.studProgressUrl
     ): List<SemesterLink> {
-        val doc = Jsoup.parse(pageHtml, pageUrl)
-
-        val table = doc.selectFirst("#ctl00_ctl00_ContentPlaceHolder0_ContentPlaceHolder1_ctlStudProgress1_tblSemester")
-            ?: return emptyList()
-
-        val result = mutableListOf<SemesterLink>()
-        val rows = table.select("tr")
-        if (rows.isEmpty()) return emptyList()
-
-        val courseHeaders = rows.first()
-            ?.select("th")
-            ?.map { it.text().trim() }
-
-        rows.drop(1).forEach { row ->
-            val cells = row.select("td")
-            cells.forEachIndexed { index, cell ->
-                val link = cell.selectFirst("a[href^=javascript:__doPostBack]") ?: return@forEachIndexed
-                val href = link.attr("href")
-                val eventTarget = extractEventTargetFromJsPostBack(href) ?: return@forEachIndexed
-                val eventArgument = extractEventArgumentFromJsPostBack(href) ?: ""
-
-                val course = courseHeaders?.getOrNull(index).orEmpty()
-                val sessionName = link.text().trim()
-
-                val title = listOf(course, sessionName)
-                    .filter { it.isNotBlank() }
-                    .joinToString(" — ")
-
-                result += SemesterLink(
-                    title = title,
-                    eventTarget = eventTarget,
-                    eventArgument = eventArgument,
-                    isSelected = link.attr("style").contains("font-weight:bold", ignoreCase = true)
-                )
-            }
-        }
-
-        return result
-    }
-
-    private fun extractEventTargetFromJsPostBack(href: String): String? {
-        val regex = Regex("""__doPostBack\('([^']*)','([^']*)'\)""")
-        val match = regex.find(href) ?: return null
-        return match.groupValues[1]
-    }
-
-    private fun extractEventArgumentFromJsPostBack(href: String): String? {
-        val regex = Regex("""__doPostBack\('([^']*)','([^']*)'\)""")
-        val match = regex.find(href) ?: return null
-        return match.groupValues[2]
+        return com.example.scheduleiseu.data.remote.parser.cabinet.findAvailableSemesters(pageHtml, pageUrl)
     }
 
     fun openSemester(semester: SemesterLink): String {
-        val studProgressHtml = getPage(STUD_PROGRESS_URL)
+        val studProgressHtml = getPage(BsuCabinetConfig.studProgressUrl)
         return doPostBack(
-            pageUrl = STUD_PROGRESS_URL,
+            pageUrl = BsuCabinetConfig.studProgressUrl,
             pageHtml = studProgressHtml,
             eventTarget = semester.eventTarget,
             eventArgument = semester.eventArgument
@@ -332,15 +267,15 @@ class BsuParser(
     }
 
     fun openLatestSemester(): Pair<SemesterLink, String> {
-        val studProgressHtml = getPage(STUD_PROGRESS_URL)
-        val semesters = findAvailableSemesters(studProgressHtml, STUD_PROGRESS_URL)
+        val studProgressHtml = getPage(BsuCabinetConfig.studProgressUrl)
+        val semesters = findAvailableSemesters(studProgressHtml, BsuCabinetConfig.studProgressUrl)
 
         val latest = semesters.firstOrNull { it.isSelected }
             ?: semesters.lastOrNull()
             ?: error("Семестры не найдены на странице успеваемости")
 
         val html = doPostBack(
-            pageUrl = STUD_PROGRESS_URL,
+            pageUrl = BsuCabinetConfig.studProgressUrl,
             pageHtml = studProgressHtml,
             eventTarget = latest.eventTarget,
             eventArgument = latest.eventArgument
@@ -354,87 +289,18 @@ class BsuParser(
         progressHtml: String? = null,
         photoBytes: ByteArray? = null
     ): ProfileData {
-        val cabinetDoc = Jsoup.parse(cabinetHtml, CABINET_URL)
-        val progressDoc = progressHtml
-            ?.takeIf { it.isNotBlank() }
-            ?.let { Jsoup.parse(it, STUD_PROGRESS_URL) }
-
-        val fullName = cabinetDoc.selectFirst("#ctl00_ctl00_LoginView1_LoginFIO")
-            ?.text()
-            ?.normalizeCabinetText()
-            ?.takeIf { it.isNotBlank() }
-            ?: cabinetDoc.selectFirst("#ctl00_ctl00_ContentPlaceHolder0_lbFIO1")
-                ?.text()
-                ?.normalizeCabinetText()
-                ?.takeIf { it.isNotBlank() }
-            ?: progressDoc?.selectFirst("#ctl00_ctl00_ContentPlaceHolder0_lbFIO1")
-                ?.text()
-                ?.normalizeCabinetText()
-                ?.takeIf { it.isNotBlank() }
-
-        val faculty = progressDoc
-            ?.selectFirst("#ctl00_ctl00_ContentPlaceHolder0_ContentPlaceHolder1_ctlStudProgress1_lbStudFacultet")
-            ?.text()
-            ?.normalizeCabinetText()
-            ?.takeIf { it.isNotBlank() }
-
-        val groupInfo = progressDoc
-            ?.selectFirst("#ctl00_ctl00_ContentPlaceHolder0_ContentPlaceHolder1_ctlStudProgress1_lbStudKurs")
-            ?.text()
-            ?.normalizeCabinetText()
-            ?.takeIf { it.isNotBlank() }
-
-        val averageScore = progressDoc
-            ?.selectFirst("#ctl00_ctl00_ContentPlaceHolder0_ContentPlaceHolder1_ctlStudProgress1_lbStudBall")
-            ?.text()
-            ?.normalizeAverageScore()
-            ?.takeIf { it.isNotBlank() }
-
-        return ProfileData(
-            fullName = fullName,
-            role = if (isCabinetPage(cabinetHtml)) "Студент" else null,
-            faculty = faculty,
-            groupInfo = groupInfo,
-            averageScore = averageScore,
-            cabinetMenuLinks = parseCabinetMenuLinks(cabinetDoc),
+        return com.example.scheduleiseu.data.remote.parser.cabinet.parseProfileData(
             cabinetHtml = cabinetHtml,
             progressHtml = progressHtml,
             photoBytes = photoBytes
         )
     }
 
-    private fun parseCabinetMenuLinks(doc: org.jsoup.nodes.Document): List<CabinetMenuLink> {
-        return doc.select(".Sub1 a[href], .Sub2 a[href]")
-            .mapNotNull { link ->
-                val title = link.text().normalizeCabinetText()
-                if (title.isBlank()) return@mapNotNull null
-
-                CabinetMenuLink(
-                    title = title,
-                    url = link.absUrl("href").ifBlank { link.attr("href").takeIf { it.isNotBlank() } }
-                )
-            }
-            .distinctBy { it.title to it.url }
-    }
-
-    private fun String.normalizeAverageScore(): String {
-        return normalizeCabinetText()
-            .removePrefix("средний балл:")
-            .removePrefix("Средний балл:")
-            .trim()
-    }
-
-    private fun String.normalizeCabinetText(): String {
-        return replace('\u00A0', ' ')
-            .replace(Regex("\\s+"), " ")
-            .trim()
-    }
-
     fun loadPhotoImage(): ByteArray {
         val request = Request.Builder()
-            .url(PHOTO_URL)
+            .url(BsuCabinetConfig.photoUrl)
             .get()
-            .header("User-Agent", "Mozilla/5.0")
+            .header("User-Agent", BsuCabinetConfig.userAgent)
             .build()
 
         client.newCall(request).execute().use { response ->
@@ -446,103 +312,8 @@ class BsuParser(
         }
     }
 
-    fun parseProgressTable(html: String, pageUrl: String = STUD_PROGRESS_URL): ProgressTableResult {
-        val doc = Jsoup.parse(html, pageUrl)
-
-        val table = doc.selectFirst("#ctl00_ctl00_ContentPlaceHolder0_ContentPlaceHolder1_ctlStudProgress1_tblProgress")
-            ?: error("Таблица успеваемости не найдена")
-
-        val rows = table.select("tr")
-        if (rows.isEmpty()) error("Таблица успеваемости пуста")
-
-        val semesterTitle = rows.first()
-            ?.selectFirst("td[colspan]")
-            ?.text()
-            ?.trim()
-            .orEmpty()
-            .ifBlank { "Неизвестный семестр" }
-
-        val items = mutableListOf<ProgressItem>()
-
-        rows.drop(3).forEach { row ->
-            val lessonTd = row.selectFirst("td.styleLessonBody") ?: return@forEach
-            val zachTd = row.selectFirst("td.styleZachBody")
-            val examTd = row.selectFirst("td.styleExamBody")
-
-            val subject = lessonTd.text().trim()
-            if (subject.isBlank()) return@forEach
-
-            val zachValue = extractCellValue(zachTd)
-            val examValue = extractCellValue(examTd)
-
-            val parsed = classifyResult(zachValue, examValue) ?: return@forEach
-
-            items += ProgressItem(
-                subject = subject,
-                type = parsed.first,
-                result = parsed.second
-            )
-        }
-
-        return ProgressTableResult(
-            semesterTitle = semesterTitle,
-            items = items
-        )
-    }
-
-    private fun classifyResult(zachValue: String, examValue: String): Pair<String, String>? {
-        val zachGrade = extractGrade(zachValue)
-        val examGrade = extractGrade(examValue)
-
-        val zachIsPass = isPass(zachValue)
-        val examHasGrade = examGrade != null
-        val examIsDeclared = isExam(examValue)
-
-        return when {
-            zachGrade != null -> "Диф. зачет" to zachGrade
-            zachIsPass && examHasGrade -> "Диф. зачет" to examGrade
-            zachIsPass && !examHasGrade -> "Зачет" to "+"
-            !zachIsPass && examHasGrade -> "Экзамен" to examGrade
-            !zachIsPass && examIsDeclared -> "Экзамен" to ""
-            else -> null
-        }
-    }
-
-    private fun extractCellValue(td: Element?): String {
-        if (td == null) return ""
-
-        val title = td.attr("title").trim()
-        val text = td.text()
-            .replace('\u00A0', ' ')
-            .trim()
-
-        return when {
-            text.isNotBlank() && text != " " -> text
-            title.isNotBlank() -> title
-            else -> ""
-        }
-    }
-
-    private fun extractGrade(value: String): String? {
-        val cleaned = value.trim()
-
-        val match = Regex("""\b([0-9]|10)\b""").find(cleaned)
-        return match?.groupValues?.get(1)
-    }
-
-    private fun isPass(value: String): Boolean {
-        val normalized = value.trim().lowercase()
-        return normalized == "+" ||
-            normalized.contains("зачтено") ||
-            normalized == "зачет"
-    }
-
-    private fun isExam(value: String): Boolean {
-        val normalized = value.trim().lowercase()
-        return normalized == "экзамен" ||
-            normalized == "экз." ||
-            normalized == "экз" ||
-            normalized.contains("экзам")
+    fun parseProgressTable(html: String, pageUrl: String = BsuCabinetConfig.studProgressUrl): ProgressTableResult {
+        return com.example.scheduleiseu.data.remote.parser.cabinet.parseProgressTable(html, pageUrl)
     }
 
 }

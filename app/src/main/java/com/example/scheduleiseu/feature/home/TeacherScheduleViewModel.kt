@@ -35,10 +35,9 @@ class TeacherScheduleViewModel(
     private val _state = MutableStateFlow(ScheduleUiState())
     val state: StateFlow<ScheduleUiState> = _state.asStateFlow()
 
-    private var cachedTeacherWeekValues: Set<String> = emptySet()
+    private val runtimeState = TeacherScheduleRuntimeState()
     private var selectedWeekObserverJob: Job? = null
     private var teacherScheduleContext: ScheduleContext? = null
-    private val manuallySelectedDayByWeekValue = mutableMapOf<String, String>()
 
     init {
         observeNetwork()
@@ -79,7 +78,7 @@ class TeacherScheduleViewModel(
 
     fun onDayClick(dayDate: String) {
         val day = _state.value.days.firstOrNull { it.date == dayDate } ?: return
-        _state.value.selectedWeek?.value?.let { weekValue -> manuallySelectedDayByWeekValue[weekValue] = day.date }
+        _state.value.selectedWeek?.value?.let { weekValue -> runtimeState.manuallySelectedDayByWeekValue[weekValue] = day.date }
         _state.update { current ->
             current.copy(
                 selectedDay = day,
@@ -100,7 +99,7 @@ class TeacherScheduleViewModel(
                         isLoading = false,
                         loadingStage = null,
                         isOfflineMode = true,
-                        offlineMessage = OFFLINE_MESSAGE,
+                        offlineMessage = SCHEDULE_OFFLINE_MESSAGE,
                         errorMessage = if (hasCachedSchedule) null else "Нет интернета и сохраненного расписания преподавателя"
                     )
                 }
@@ -153,7 +152,7 @@ class TeacherScheduleViewModel(
                             isLoading = false,
                             loadingStage = null,
                             isOfflineMode = true,
-                            offlineMessage = OFFLINE_MESSAGE,
+                            offlineMessage = SCHEDULE_OFFLINE_MESSAGE,
                             errorMessage = if (current.days.isEmpty()) current.errorMessage else null
                         )
                     }
@@ -192,13 +191,13 @@ class TeacherScheduleViewModel(
         viewModelScope.launch {
             runCatching {
                 observeOwnTeacherCachedWeekValues().collect { cachedValues ->
-                    cachedTeacherWeekValues = cachedValues
+                    runtimeState.cachedTeacherWeekValues = cachedValues
                     _state.update { current ->
                         current.copy(
-                            currentWeek = current.currentWeek?.withCachedFlag(),
-                            selectedWeek = current.selectedWeek?.withCachedFlag(),
-                            scheduleContext = current.scheduleContext?.markCachedWeeks(),
-                            availableWeeks = markCachedWeeks(current.availableWeeks)
+                            currentWeek = current.currentWeek?.withCachedFlag(runtimeState.cachedTeacherWeekValues),
+                            selectedWeek = current.selectedWeek?.withCachedFlag(runtimeState.cachedTeacherWeekValues),
+                            scheduleContext = current.scheduleContext?.markCachedWeeks(runtimeState.cachedTeacherWeekValues),
+                            availableWeeks = markCachedWeeks(current.availableWeeks, runtimeState.cachedTeacherWeekValues)
                         )
                     }
                 }
@@ -212,7 +211,7 @@ class TeacherScheduleViewModel(
                 observeOwnTeacherCachedWeeks().collect { cachedWeeks ->
                     _state.update { current ->
                         val availableWeeks = when {
-                            current.scheduleContext != null -> markCachedWeeks(current.scheduleContext.weeks)
+                            current.scheduleContext != null -> markCachedWeeks(current.scheduleContext.weeks, runtimeState.cachedTeacherWeekValues)
                             cachedWeeks.isNotEmpty() -> cachedWeeks
                             else -> emptyList()
                         }
@@ -234,7 +233,7 @@ class TeacherScheduleViewModel(
                 observeOwnTeacherScheduleForWeek(week).collect { cachedWeek ->
                     if (cachedWeek != null) {
                         applyLoadedWeek(
-                            week = cachedWeek.copy(week = week.withCachedFlag()),
+                            week = cachedWeek.copy(week = week.withCachedFlag(runtimeState.cachedTeacherWeekValues)),
                             context = teacherScheduleContext,
                             selectedWeekOverride = week
                         )
@@ -249,12 +248,12 @@ class TeacherScheduleViewModel(
             if (!networkMonitor.isCurrentlyOnline()) {
                 _state.update { current ->
                     current.copy(
-                        selectedWeek = week.withCachedFlag(),
+                        selectedWeek = week.withCachedFlag(runtimeState.cachedTeacherWeekValues),
                         isLoading = false,
                         loadingStage = null,
                         isOfflineMode = true,
-                        offlineMessage = OFFLINE_MESSAGE,
-                        errorMessage = if (week.value in cachedTeacherWeekValues || current.days.isNotEmpty()) {
+                        offlineMessage = SCHEDULE_OFFLINE_MESSAGE,
+                        errorMessage = if (week.value in runtimeState.cachedTeacherWeekValues || current.days.isNotEmpty()) {
                             null
                         } else {
                             "Эта неделя не сохранена для офлайн-режима"
@@ -281,7 +280,7 @@ class TeacherScheduleViewModel(
             runCatching { refreshOwnTeacherScheduleForWeek(week) }
                 .onSuccess {
                     applyLoadedWeek(
-                        week = it.copy(week = week.withCachedFlag()),
+                        week = it.copy(week = week.withCachedFlag(runtimeState.cachedTeacherWeekValues)),
                         context = teacherScheduleContext,
                         selectedWeekOverride = week
                     )
@@ -312,14 +311,14 @@ class TeacherScheduleViewModel(
             selectedWeek = selectedWeekOverride,
             defaultSelectedDay = resolveInitialSelectedDay(week)
         )
-        val markedContext = context?.markCachedWeeks()
+        val markedContext = context?.markCachedWeeks(runtimeState.cachedTeacherWeekValues)
         val contextWeeks = markedContext?.weeks.orEmpty()
         val availableWeeksSource = contextWeeks.ifEmpty {
             _state.value.availableWeeks.ifEmpty { listOf(selectedWeekOverride) }
         }
-        val markedWeeks = markCachedWeeks(availableWeeksSource).let { weeks ->
+        val markedWeeks = markCachedWeeks(availableWeeksSource, runtimeState.cachedTeacherWeekValues).let { weeks ->
             if (weeks.none { it.value == selectedWeekOverride.value }) {
-                markCachedWeeks(weeks + selectedWeekOverride)
+                markCachedWeeks(weeks + selectedWeekOverride, runtimeState.cachedTeacherWeekValues)
             } else {
                 weeks
             }
@@ -327,8 +326,8 @@ class TeacherScheduleViewModel(
         val isOnline = networkMonitor.isCurrentlyOnline()
 
         _state.value = _state.value.copy(
-            currentWeek = (markedContext?.currentWeek ?: markedWeeks.firstOrNull { it.isCurrent } ?: week.week).withCachedFlag(),
-            selectedWeek = selectedWeekOverride.withCachedFlag(),
+            currentWeek = (markedContext?.currentWeek ?: markedWeeks.firstOrNull { it.isCurrent } ?: week.week).withCachedFlag(runtimeState.cachedTeacherWeekValues),
+            selectedWeek = selectedWeekOverride.withCachedFlag(runtimeState.cachedTeacherWeekValues),
             days = week.days,
             selectedDay = selectedDay,
             lessonsForSelectedDay = selectedDay?.lessons.orEmpty(),
@@ -337,13 +336,13 @@ class TeacherScheduleViewModel(
             isLoading = false,
             loadingStage = null,
             isOfflineMode = !isOnline,
-            offlineMessage = if (isOnline) null else OFFLINE_MESSAGE,
+            offlineMessage = if (isOnline) null else SCHEDULE_OFFLINE_MESSAGE,
             errorMessage = null
         )
     }
 
     private fun resetManualDaySelection(week: WeekInfo) {
-        manuallySelectedDayByWeekValue.remove(week.value)
+        runtimeState.manuallySelectedDayByWeekValue.remove(week.value)
     }
 
     private fun resolveSelectedDayForApply(
@@ -351,55 +350,23 @@ class TeacherScheduleViewModel(
         selectedWeek: WeekInfo,
         defaultSelectedDay: ScheduleDay?
     ): ScheduleDay? {
-        val manuallySelectedDate = manuallySelectedDayByWeekValue[selectedWeek.value]
-        return manuallySelectedDate?.let { date -> days.firstOrNull { it.date == date } }
-            ?: defaultSelectedDay
+        return resolveTeacherSelectedDayForApply(
+            days = days,
+            selectedWeek = selectedWeek,
+            defaultSelectedDay = defaultSelectedDay,
+            manuallySelectedDayByWeekValue = runtimeState.manuallySelectedDayByWeekValue
+        )
     }
 
     private fun resolveInitialSelectedDay(week: ScheduleWeek): ScheduleDay? {
-        return week.currentDay
-            ?: week.selectedDay
-            ?: week.days.firstOrNull { it.lessons.isNotEmpty() }
-            ?: week.days.firstOrNull()
-    }
-
-    private fun ScheduleContext.markCachedWeeks(): ScheduleContext {
-        return copy(
-            currentWeek = currentWeek?.withCachedFlag(),
-            selectedWeek = selectedWeek?.withCachedFlag(),
-            weeks = markCachedWeeks(weeks)
-        )
-    }
-
-    private fun markCachedWeeks(weeks: List<WeekInfo>): List<WeekInfo> {
-        return weeks.map { it.withCachedFlag() }
-    }
-
-    private fun WeekInfo.withCachedFlag(): WeekInfo {
-        return copy(isCached = isCached || value in cachedTeacherWeekValues)
-    }
-
-    private fun mergeWithCachedWeek(week: WeekInfo, cachedWeeks: List<WeekInfo>): WeekInfo {
-        val cached = cachedWeeks.firstOrNull { it.value == week.value } ?: return week
-        return week.copy(
-            title = if (week.title.isBlank()) cached.title else week.title,
-            isCurrent = week.isCurrent || cached.isCurrent,
-            isCached = true
-        )
-    }
-
-    private fun String.removeCachedWeekMarker(): String {
-        return removeSuffix(" +").trim()
+        return resolveTeacherInitialSelectedDay(week)
     }
 
     private fun findAdjacentWeek(step: Int): WeekInfo? {
-        val weeks = _state.value.availableWeeks
-        if (weeks.isEmpty()) return null
-
-        val selectedWeekValue = _state.value.selectedWeek?.value ?: return null
-        val currentIndex = weeks.indexOfFirst { it.value == selectedWeekValue }
-        if (currentIndex == -1) return null
-
-        return weeks.getOrNull(currentIndex + step)
+        return findAdjacentWeek(
+            weeks = _state.value.availableWeeks,
+            selectedWeekValue = _state.value.selectedWeek?.value,
+            step = step
+        )
     }
 }

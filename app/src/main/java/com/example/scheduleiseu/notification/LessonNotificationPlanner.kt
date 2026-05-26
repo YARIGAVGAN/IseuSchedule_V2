@@ -36,7 +36,7 @@ class LessonNotificationPlanner(
         val firstLesson = lessons.first()
         events += LessonNotificationEvent(
             type = LessonNotificationType.FIRST_LESSON_SOON,
-            triggerAtMillis = firstLesson.startMillis - FIRST_LESSON_OFFSET_MILLIS,
+            triggerAtMillis = firstLesson.startMillis - LessonNotificationRules.firstLessonOffsetMillis,
             lessonTitle = firstLesson.lesson.title,
             lessonType = firstLesson.lesson.type,
             classroom = firstLesson.lesson.classroom
@@ -98,7 +98,7 @@ class LessonNotificationPlanner(
     }
 
     private fun Lesson.isForeignLanguageLesson(): Boolean {
-        return title.contains(FOREIGN_LANGUAGE_MARKER, ignoreCase = true)
+        return title.contains(LessonNotificationRules.foreignLanguageMarker, ignoreCase = true)
     }
 
     private fun Lesson.toTimedLesson(dayDate: String): TimedLesson? {
@@ -121,15 +121,15 @@ class LessonNotificationPlanner(
 
     private fun String.toLocalDateOrNull(): LocalDate? {
         val normalized = trim().substringBefore(' ')
-        return DATE_FORMATTERS.firstNotNullOfOrNull { formatter ->
+        return LessonNotificationRules.supportedDateFormatters.firstNotNullOfOrNull { formatter ->
             runCatching { LocalDate.parse(normalized, formatter) }.getOrNull()
         }
     }
 
     private fun String.toLocalTimeOrNull(): LocalTime? {
         val normalized = normalizeTime()
-        if (!TIME_PATTERN.matches(normalized)) return null
-        return runCatching { LocalTime.parse(normalized, TIME_FORMATTER) }.getOrNull()
+        if (!LessonNotificationRules.supportedTimePattern.matches(normalized)) return null
+        return runCatching { LocalTime.parse(normalized, LessonNotificationRules.supportedTimeFormatter) }.getOrNull()
     }
 
     private fun String.parseRawRangeStart(): LocalTime? = parseRawRangePart(index = 0)
@@ -169,15 +169,4 @@ class LessonNotificationPlanner(
         val startMillis: Long,
         val endMillis: Long?
     )
-
-    private companion object {
-        const val FIRST_LESSON_OFFSET_MILLIS = 15 * 60 * 1000L
-        const val FOREIGN_LANGUAGE_MARKER = "иностранный язык"
-        val DATE_FORMATTERS: List<DateTimeFormatter> = listOf(
-            DateTimeFormatter.ofPattern("dd.MM.yyyy", Locale("ru")),
-            DateTimeFormatter.ISO_LOCAL_DATE
-        )
-        val TIME_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("H:mm", Locale("ru"))
-        val TIME_PATTERN: Regex = Regex("^\\d{1,2}:\\d{2}$")
-    }
 }

@@ -16,7 +16,6 @@ import com.example.scheduleiseu.domain.core.service.CaptchaRecognizer
 import com.example.scheduleiseu.domain.core.usecase.BackgroundRefreshResult
 import com.example.scheduleiseu.domain.core.usecase.BackgroundRefreshUseCase
 import com.example.scheduleiseu.domain.core.usecase.FirstEntryBootstrapUseCase
-import com.example.scheduleiseu.domain.model.SettingsItem
 import com.example.scheduleiseu.feature.menu.DrawerDestination
 import com.example.scheduleiseu.notification.LessonNotificationScheduler
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -59,9 +58,17 @@ class AppNavigationViewModel(
     private val _commands = MutableSharedFlow<AppNavigationCommand>()
     val commands: SharedFlow<AppNavigationCommand> = _commands.asSharedFlow()
 
-    private var pendingStudentBootstrapAccountKey: String? = null
-    private var startupAutoLoginInProgress = false
-    private var startupAutoLoginAttempted = false
+    private val runtimeState = AppNavigationRuntimeState()
+    private val logoutSupport = AppNavigationLogoutSupport(
+        authRepository = authRepository,
+        studentRegistrationRepository = studentRegistrationRepository,
+        teacherRegistrationRepository = teacherRegistrationRepository,
+        scheduleRepository = scheduleRepository,
+        performanceRepository = performanceRepository,
+        profileRepository = profileRepository,
+        preferencesDataSource = preferencesDataSource,
+        lessonNotificationScheduler = lessonNotificationScheduler
+    )
 
 
     init {
@@ -129,7 +136,7 @@ class AppNavigationViewModel(
                 }
                 return@launch
             }
-            pendingStudentBootstrapAccountKey = accountKey
+            runtimeState.pendingStudentBootstrapAccountKey = accountKey
             val hasStudentProfile = preferencesDataSource.getStudentProfile() != null
             val registrationCompleted = preferencesDataSource.isStudentRegistrationCompleted()
             val shouldOpenHome = hasStudentProfile || registrationCompleted
@@ -164,7 +171,7 @@ class AppNavigationViewModel(
             preferencesDataSource.setStudentScheduleOnlyModeEnabled(true)
             preferencesDataSource.clearStudentCredentials()
             preferencesDataSource.clearAuthFlags()
-            pendingStudentBootstrapAccountKey = null
+            runtimeState.pendingStudentBootstrapAccountKey = null
             _state.update {
                 it.copy(
                     userRole = UserRole.STUDENT,
@@ -202,12 +209,12 @@ class AppNavigationViewModel(
             }
 
             if (scheduleOnly) {
-                pendingStudentBootstrapAccountKey = null
+                runtimeState.pendingStudentBootstrapAccountKey = null
                 openHome(runBackgroundRefresh = true, offlineLoginRequired = false)
                 return@launch
             }
 
-            val accountKey = pendingStudentBootstrapAccountKey
+            val accountKey = runtimeState.pendingStudentBootstrapAccountKey
                 ?: preferencesDataSource.getSavedStudentLogin()?.toStudentBootstrapAccountKey()
 
             if (accountKey == null) {
@@ -220,7 +227,7 @@ class AppNavigationViewModel(
                 return@launch
             }
 
-            pendingStudentBootstrapAccountKey = accountKey
+            runtimeState.pendingStudentBootstrapAccountKey = accountKey
             navigateHomeAfterStudentBootstrapIfNeeded(accountKey)
         }
     }
@@ -258,7 +265,7 @@ class AppNavigationViewModel(
     }
 
     fun retryStudentBootstrap() {
-        val accountKey = pendingStudentBootstrapAccountKey ?: return
+        val accountKey = runtimeState.pendingStudentBootstrapAccountKey ?: return
         viewModelScope.launch {
             navigateHomeAfterStudentBootstrapIfNeeded(accountKey)
         }
@@ -518,7 +525,7 @@ class AppNavigationViewModel(
                         !shouldTryStartupAutoLogin,
                     isStudentScheduleOnlyMode = scheduleOnly,
                     isOfflineMode = !isOnline,
-                    offlineMessage = if (isOnline) null else OFFLINE_MESSAGE
+                    offlineMessage = if (isOnline) null else NAVIGATION_OFFLINE_MESSAGE
                 )
             }
             if (targetRoute == AppRoute.Home.route) {
@@ -574,7 +581,7 @@ class AppNavigationViewModel(
                 activeHomeSelector = null,
                 offlineLoginRequired = offlineLoginRequired && !it.isStudentScheduleOnlyMode,
                 isOfflineMode = !isOnline,
-                offlineMessage = if (isOnline) null else OFFLINE_MESSAGE
+                offlineMessage = if (isOnline) null else NAVIGATION_OFFLINE_MESSAGE
             )
         }
         _commands.emit(AppNavigationCommand.ClearBackStackAndNavigate(AppRoute.Home.route))
@@ -584,15 +591,15 @@ class AppNavigationViewModel(
     }
 
     private fun launchBackgroundRefresh() {
-        if (startupAutoLoginInProgress) return
+        if (runtimeState.startupAutoLoginInProgress) return
 
         viewModelScope.launch {
-            if (startupAutoLoginInProgress) return@launch
+            if (runtimeState.startupAutoLoginInProgress) return@launch
             if (!networkMonitor.isCurrentlyOnline()) {
                 _state.update { current ->
                     current.copy(
                         isOfflineMode = true,
-                        offlineMessage = OFFLINE_MESSAGE,
+                        offlineMessage = NAVIGATION_OFFLINE_MESSAGE,
                         offlineLoginRequired = current.offlineLoginRequired && !current.isStudentScheduleOnlyMode
                     )
                 }
@@ -622,11 +629,11 @@ class AppNavigationViewModel(
                 _state.update {
                     it.copy(
                         isOfflineMode = !isOnline,
-                        offlineMessage = if (isOnline) null else OFFLINE_MESSAGE
+                        offlineMessage = if (isOnline) null else NAVIGATION_OFFLINE_MESSAGE
                     )
                 }
                 if (!isOnline) {
-                    startupAutoLoginAttempted = false
+                    runtimeState.startupAutoLoginAttempted = false
                     return@collect
                 }
 
@@ -641,7 +648,7 @@ class AppNavigationViewModel(
     }
 
     private fun launchStartupAutoLoginIfNeeded(): Boolean {
-        if (startupAutoLoginInProgress || startupAutoLoginAttempted) return false
+        if (runtimeState.startupAutoLoginInProgress || runtimeState.startupAutoLoginAttempted) return false
         if (!networkMonitor.isCurrentlyOnline()) return false
 
         val current = _state.value
@@ -649,14 +656,14 @@ class AppNavigationViewModel(
             return false
         }
 
-        startupAutoLoginInProgress = true
-        startupAutoLoginAttempted = true
+        runtimeState.startupAutoLoginInProgress = true
+        runtimeState.startupAutoLoginAttempted = true
 
         viewModelScope.launch {
             val login = preferencesDataSource.getSavedStudentLogin().orEmpty()
             val password = preferencesDataSource.getSavedStudentPassword().orEmpty()
             if (login.isBlank() || password.isBlank()) {
-                startupAutoLoginInProgress = false
+                runtimeState.startupAutoLoginInProgress = false
                 _state.update { currentState ->
                     currentState.copy(
                         offlineLoginRequired = currentState.isMainFlow &&
@@ -684,13 +691,13 @@ class AppNavigationViewModel(
                 )
             }
 
-            startupAutoLoginInProgress = false
+            runtimeState.startupAutoLoginInProgress = false
 
             result.onSuccess { authenticatedSession ->
                 preferencesDataSource.setStudentScheduleOnlyModeEnabled(false)
                 preferencesDataSource.saveStudentCredentials(login = login, password = password)
                 val accountKey = login.toStudentBootstrapAccountKey()
-                pendingStudentBootstrapAccountKey = accountKey
+                runtimeState.pendingStudentBootstrapAccountKey = accountKey
                 _state.update {
                     it.copy(
                         studentDisplayName = authenticatedSession.displayName?.takeIf { name -> name.isNotBlank() },
@@ -764,21 +771,7 @@ class AppNavigationViewModel(
                 )
             }
 
-            val logoutResult = runCatching {
-                authRepository.clearActiveSession()
-                studentRegistrationRepository.clearSavedStudentProfile()
-                teacherRegistrationRepository.clearSavedTeacherProfile()
-                scheduleRepository.clearTeacherSessionState()
-                scheduleRepository.clearAllCachedScheduleWeeks()
-                performanceRepository.clearCachedPerformance()
-                profileRepository.clearCachedUserPhotos()
-                preferencesDataSource.resetStudentBootstrap()
-                preferencesDataSource.clearStudentCredentials()
-                preferencesDataSource.clearSessionFlagsForLogout()
-                preferencesDataSource.setLessonNotificationsEnabled(false)
-                preferencesDataSource.setUserRole(UserRole.STUDENT)
-                lessonNotificationScheduler.cancelAll()
-            }
+            val logoutResult = logoutSupport.logoutTeacher()
 
             _state.update {
                 it.copy(
@@ -793,7 +786,7 @@ class AppNavigationViewModel(
                 )
             }
             if (logoutResult.isSuccess) {
-                pendingStudentBootstrapAccountKey = null
+                runtimeState.pendingStudentBootstrapAccountKey = null
                 _commands.emit(AppNavigationCommand.ClearBackStackAndNavigate(AppRoute.Start.route))
             }
         }
@@ -811,26 +804,9 @@ class AppNavigationViewModel(
                 )
             }
 
-            val logoutResult = runCatching {
-                if (_state.value.isStudentScheduleOnlyMode) {
-                    authRepository.clearActiveSession()
-                } else {
-                    runCatching { authRepository.logout() }
-                    authRepository.clearActiveSession()
-                }
-                studentRegistrationRepository.clearSavedStudentProfile()
-                teacherRegistrationRepository.clearSavedTeacherProfile()
-                scheduleRepository.clearTeacherSessionState()
-                scheduleRepository.clearAllCachedScheduleWeeks()
-                performanceRepository.clearCachedPerformance()
-                profileRepository.clearCachedUserPhotos()
-                preferencesDataSource.resetStudentBootstrap()
-                preferencesDataSource.clearStudentCredentials()
-                preferencesDataSource.clearSessionFlagsForLogout()
-                preferencesDataSource.setLessonNotificationsEnabled(false)
-                preferencesDataSource.setUserRole(UserRole.STUDENT)
-                lessonNotificationScheduler.cancelAll()
-            }
+            val logoutResult = logoutSupport.logoutStudent(
+                isStudentScheduleOnlyMode = _state.value.isStudentScheduleOnlyMode
+            )
             val logoutError = logoutResult.exceptionOrNull()?.message
             _state.update {
                 it.copy(
@@ -845,52 +821,8 @@ class AppNavigationViewModel(
                 )
             }
             if (logoutResult.isSuccess) {
-                pendingStudentBootstrapAccountKey = null
+                runtimeState.pendingStudentBootstrapAccountKey = null
                 _commands.emit(AppNavigationCommand.ClearBackStackAndNavigate(AppRoute.Start.route))
-            }
-        }
-    }
-
-    private fun String.toStudentBootstrapAccountKey(): String? {
-        return trim().lowercase().takeIf { it.isNotBlank() }
-    }
-
-    private companion object {
-        const val CACHE_CURRENT_AND_PREVIOUS_WEEK_ID = "cache_current_previous_week"
-        const val LESSON_NOTIFICATIONS_ID = "lesson_notifications"
-        const val SHOW_MISMATCHED_SUBGROUP_LESSONS_ID = "show_mismatched_subgroup_lessons"
-        const val OFFLINE_MESSAGE = "Нет подключения к интернету. Показываем сохраненные данные."
-        const val NO_SAVED_SCHEDULE_CACHE_MESSAGE =
-            "Без сохраненного расписания уведомления невозможны"
-        const val NOTIFICATIONS_DISABLED_MESSAGE = "Уведомления отключены"
-
-        fun settingsFrom(
-            role: UserRole,
-            cacheCurrentAndPreviousWeek: Boolean,
-            lessonNotificationsEnabled: Boolean,
-            showMismatchedSubgroupLessons: Boolean
-        ): List<SettingsItem> {
-            val notificationsSetting = SettingsItem(
-                id = LESSON_NOTIFICATIONS_ID,
-                title = "Уведомления о парах",
-                checked = lessonNotificationsEnabled
-            )
-
-            return when (role) {
-                UserRole.TEACHER -> listOf(notificationsSetting)
-                UserRole.STUDENT -> listOf(
-                    SettingsItem(
-                        id = CACHE_CURRENT_AND_PREVIOUS_WEEK_ID,
-                        title = "Сохранять текущую и следующую неделю в кэш",
-                        checked = cacheCurrentAndPreviousWeek
-                    ),
-                    SettingsItem(
-                        id = SHOW_MISMATCHED_SUBGROUP_LESSONS_ID,
-                        title = "Показывать пары другой подгруппы",
-                        checked = showMismatchedSubgroupLessons
-                    ),
-                    notificationsSetting
-                )
             }
         }
     }

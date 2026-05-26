@@ -22,9 +22,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 class ScheduleRepositoryImpl(
     private val scheduleRemoteDataSource: ScheduleRemoteDataSource,
@@ -48,10 +45,10 @@ class ScheduleRepositoryImpl(
         week: WeekInfo?
     ): Flow<ScheduleWeek?> {
         val dao = scheduleCacheDao ?: return flowOf(null)
-        val ownerId = buildStudentOwnerId(facultyId, departmentId, courseId, groupId)
+        val ownerId = ScheduleCacheKeys.buildStudentOwnerId(facultyId, departmentId, courseId, groupId)
         val source = week
-            ?.let { selectedWeek -> dao.observeByKey(buildCacheKey(ROLE_STUDENT, ownerId, selectedWeek)) }
-            ?: dao.observeCurrentOrLatest(ROLE_STUDENT, ownerId)
+            ?.let { selectedWeek -> dao.observeByKey(ScheduleCacheKeys.buildCacheKey(ScheduleCacheKeys.roleStudent, ownerId, selectedWeek)) }
+            ?: dao.observeCurrentOrLatest(ScheduleCacheKeys.roleStudent, ownerId)
 
         return source.map { cached ->
             cached?.let { entity ->
@@ -67,8 +64,8 @@ class ScheduleRepositoryImpl(
         val dao = scheduleCacheDao ?: return flowOf(null)
         val ownerId = teacherId.trim()
         val source = week
-            ?.let { selectedWeek -> dao.observeByKey(buildCacheKey(ROLE_TEACHER, ownerId, selectedWeek)) }
-            ?: dao.observeCurrentOrLatest(ROLE_TEACHER, ownerId)
+            ?.let { selectedWeek -> dao.observeByKey(ScheduleCacheKeys.buildCacheKey(ScheduleCacheKeys.roleTeacher, ownerId, selectedWeek)) }
+            ?: dao.observeCurrentOrLatest(ScheduleCacheKeys.roleTeacher, ownerId)
 
         return source.map { cached ->
             cached?.let { entity ->
@@ -84,13 +81,13 @@ class ScheduleRepositoryImpl(
         groupId: String
     ): Flow<Set<String>> {
         val dao = scheduleCacheDao ?: return flowOf(emptySet())
-        val ownerId = buildStudentOwnerId(facultyId, departmentId, courseId, groupId)
-        return dao.observeCachedWeekValues(ROLE_STUDENT, ownerId).map { it.toSet() }
+        val ownerId = ScheduleCacheKeys.buildStudentOwnerId(facultyId, departmentId, courseId, groupId)
+        return dao.observeCachedWeekValues(ScheduleCacheKeys.roleStudent, ownerId).map { it.toSet() }
     }
 
     override fun observeCachedTeacherWeekValues(teacherId: String): Flow<Set<String>> {
         val dao = scheduleCacheDao ?: return flowOf(emptySet())
-        return dao.observeCachedWeekValues(ROLE_TEACHER, teacherId.trim()).map { it.toSet() }
+        return dao.observeCachedWeekValues(ScheduleCacheKeys.roleTeacher, teacherId.trim()).map { it.toSet() }
     }
 
     override fun observeCachedStudentWeeks(
@@ -100,16 +97,16 @@ class ScheduleRepositoryImpl(
         groupId: String
     ): Flow<List<WeekInfo>> {
         val dao = scheduleCacheDao ?: return flowOf(emptyList())
-        val ownerId = buildStudentOwnerId(facultyId, departmentId, courseId, groupId)
-        return dao.observeWeeksForOwner(ROLE_STUDENT, ownerId).map { entities ->
-            withContext(Dispatchers.Default) { toCachedWeekInfos(entities) }
+        val ownerId = ScheduleCacheKeys.buildStudentOwnerId(facultyId, departmentId, courseId, groupId)
+        return dao.observeWeeksForOwner(ScheduleCacheKeys.roleStudent, ownerId).map { entities ->
+            withContext(Dispatchers.Default) { ScheduleCachePolicy.toCachedWeekInfos(entities) }
         }
     }
 
     override fun observeCachedTeacherWeeks(teacherId: String): Flow<List<WeekInfo>> {
         val dao = scheduleCacheDao ?: return flowOf(emptyList())
-        return dao.observeWeeksForOwner(ROLE_TEACHER, teacherId.trim()).map { entities ->
-            withContext(Dispatchers.Default) { toCachedWeekInfos(entities) }
+        return dao.observeWeeksForOwner(ScheduleCacheKeys.roleTeacher, teacherId.trim()).map { entities ->
+            withContext(Dispatchers.Default) { ScheduleCachePolicy.toCachedWeekInfos(entities) }
         }
     }
 
@@ -189,7 +186,7 @@ class ScheduleRepositoryImpl(
         groupId: String,
         week: WeekInfo
     ): ScheduleWeek = scheduleRefreshMutex.withLock {
-        val ownerId = buildStudentOwnerId(facultyId, departmentId, courseId, groupId)
+        val ownerId = ScheduleCacheKeys.buildStudentOwnerId(facultyId, departmentId, courseId, groupId)
         val selectedState = selectStudentContext(
             facultyId = facultyId,
             departmentId = departmentId,
@@ -208,10 +205,10 @@ class ScheduleRepositoryImpl(
 
         sessionStore.saveStudentRawState(weekState)
         val scheduleWeek = withContext(Dispatchers.Default) { studentWeekMapper.map(weekState) }
-        val requestedWeek = week.normalizedAgainst(scheduleWeek.week)
+        val requestedWeek = ScheduleCachePolicy.normalizeRequestedWeek(week, scheduleWeek.week)
 
         saveScheduleCache(
-            role = ROLE_STUDENT,
+            role = ScheduleCacheKeys.roleStudent,
             ownerId = ownerId,
             requestedWeek = requestedWeek,
             context = context,
@@ -250,10 +247,10 @@ class ScheduleRepositoryImpl(
 
         sessionStore.saveTeacherRawState(weekState)
         val scheduleWeek = withContext(Dispatchers.Default) { teacherWeekMapper.map(weekState) }
-        val requestedWeek = week.normalizedAgainst(scheduleWeek.week)
+        val requestedWeek = ScheduleCachePolicy.normalizeRequestedWeek(week, scheduleWeek.week)
 
         saveScheduleCache(
-            role = ROLE_TEACHER,
+            role = ScheduleCacheKeys.roleTeacher,
             ownerId = ownerId,
             requestedWeek = requestedWeek,
             context = context,
@@ -270,8 +267,8 @@ class ScheduleRepositoryImpl(
     }
 
     override suspend fun clearAllCachedScheduleWeeks() {
-        scheduleCacheDao?.deleteAllWeeksForRole(ROLE_STUDENT)
-        scheduleCacheDao?.deleteAllWeeksForRole(ROLE_TEACHER)
+        scheduleCacheDao?.deleteAllWeeksForRole(ScheduleCacheKeys.roleStudent)
+        scheduleCacheDao?.deleteAllWeeksForRole(ScheduleCacheKeys.roleTeacher)
         sessionStore.clearStudentRawState()
         sessionStore.clearTeacherRawState()
     }
@@ -328,12 +325,12 @@ class ScheduleRepositoryImpl(
         scheduleWeek: ScheduleWeek
     ) {
         val dao = scheduleCacheDao ?: return
-        val cacheEnabled = role == ROLE_TEACHER || preferencesDataSource?.isCacheCurrentAndPreviousWeekEnabled() == true
+        val cacheEnabled = role == ScheduleCacheKeys.roleTeacher || preferencesDataSource?.isCacheCurrentAndPreviousWeekEnabled() == true
         if (!cacheEnabled) {
             dao.deleteAllWeeksForOwner(role = role, ownerId = ownerId)
             return
         }
-        val policyWeeks = resolveAllowedWeeks(context = context, selectedWeek = requestedWeek)
+        val policyWeeks = ScheduleCachePolicy.resolveAllowedWeeks(context = context, selectedWeek = requestedWeek)
         val current = policyWeeks.firstOrNull { it.isCurrent }
         val cacheableWeek = policyWeeks.firstOrNull { it.value == requestedWeek.value }
 
@@ -341,7 +338,7 @@ class ScheduleRepositoryImpl(
             dao.upsert(
                 withContext(Dispatchers.Default) {
                     ScheduleCacheCodec.toEntity(
-                    cacheKey = buildCacheKey(role = role, ownerId = ownerId, week = cacheableWeek),
+                    cacheKey = ScheduleCacheKeys.buildCacheKey(role = role, ownerId = ownerId, week = cacheableWeek),
                     role = role,
                     ownerId = ownerId,
                     week = scheduleWeek.copy(week = cacheableWeek.copy(isCached = true)),
@@ -366,11 +363,11 @@ class ScheduleRepositoryImpl(
         ownerId: String
     ) {
         val dao = scheduleCacheDao ?: return
-        val weeksToPreload = resolveAllowedWeeks(context = context, selectedWeek = requestedWeek)
+        val weeksToPreload = ScheduleCachePolicy.resolveAllowedWeeks(context = context, selectedWeek = requestedWeek)
             .filterNot { it.value == requestedWeek.value }
 
         weeksToPreload.forEach { targetWeek ->
-            val targetKey = buildCacheKey(ROLE_STUDENT, ownerId, targetWeek)
+            val targetKey = ScheduleCacheKeys.buildCacheKey(ScheduleCacheKeys.roleStudent, ownerId, targetWeek)
             if (dao.getByKey(targetKey) != null) return@forEach
 
             runCatching {
@@ -384,9 +381,9 @@ class ScheduleRepositoryImpl(
                     currentData = selectedState
                 ) ?: return@runCatching
                 val scheduleWeek = withContext(Dispatchers.Default) { studentWeekMapper.map(targetState) }
-                val normalizedWeek = targetWeek.normalizedAgainst(scheduleWeek.week)
+                val normalizedWeek = ScheduleCachePolicy.normalizeRequestedWeek(targetWeek, scheduleWeek.week)
                 saveScheduleCache(
-                    role = ROLE_STUDENT,
+                    role = ScheduleCacheKeys.roleStudent,
                     ownerId = ownerId,
                     requestedWeek = normalizedWeek,
                     context = context,
@@ -403,11 +400,11 @@ class ScheduleRepositoryImpl(
         ownerId: String
     ) {
         val dao = scheduleCacheDao ?: return
-        val weeksToPreload = resolveAllowedWeeks(context = context, selectedWeek = requestedWeek)
+        val weeksToPreload = ScheduleCachePolicy.resolveAllowedWeeks(context = context, selectedWeek = requestedWeek)
             .filterNot { it.value == requestedWeek.value }
 
         weeksToPreload.forEach { targetWeek ->
-            val targetKey = buildCacheKey(ROLE_TEACHER, ownerId, targetWeek)
+            val targetKey = ScheduleCacheKeys.buildCacheKey(ScheduleCacheKeys.roleTeacher, ownerId, targetWeek)
             if (dao.getByKey(targetKey) != null) return@forEach
 
             runCatching {
@@ -420,9 +417,9 @@ class ScheduleRepositoryImpl(
                     currentData = currentData
                 ) ?: return@runCatching
                 val scheduleWeek = withContext(Dispatchers.Default) { teacherWeekMapper.map(targetState) }
-                val normalizedWeek = targetWeek.normalizedAgainst(scheduleWeek.week)
+                val normalizedWeek = ScheduleCachePolicy.normalizeRequestedWeek(targetWeek, scheduleWeek.week)
                 saveScheduleCache(
-                    role = ROLE_TEACHER,
+                    role = ScheduleCacheKeys.roleTeacher,
                     ownerId = ownerId,
                     requestedWeek = normalizedWeek,
                     context = context,
@@ -432,94 +429,4 @@ class ScheduleRepositoryImpl(
         }
     }
 
-    private fun resolveAllowedWeeks(
-        context: ScheduleContext,
-        selectedWeek: WeekInfo
-    ): List<WeekInfo> {
-        val current = resolveCurrentWeek(context = context, selectedWeek = selectedWeek).copy(isCurrent = true)
-        val next = resolveNextWeek(context = context, selectedWeek = current)
-        return listOfNotNull(current, next).distinctBy { it.value }
-    }
-
-    private fun resolveCurrentWeek(context: ScheduleContext, selectedWeek: WeekInfo): WeekInfo {
-        return context.currentWeek
-            ?: context.weeks.firstOrNull { it.isCurrent }
-            ?: context.weeks.firstOrNull { it.value == selectedWeek.value }?.copy(isCurrent = selectedWeek.isCurrent)
-            ?: selectedWeek
-    }
-
-    private fun resolveNextWeek(context: ScheduleContext, selectedWeek: WeekInfo): WeekInfo? {
-        return resolveCalendarNextWeek(
-            weeks = context.weeks,
-            baseWeek = selectedWeek
-        )
-    }
-
-    private fun resolveCalendarNextWeek(
-        weeks: List<WeekInfo>,
-        baseWeek: WeekInfo
-    ): WeekInfo? {
-        val baseDate = baseWeek.toStartDateOrNull()
-        val datedWeeks = weeks.mapNotNull { week ->
-            week.toStartDateOrNull()?.let { date -> week to date }
-        }
-
-        if (baseDate != null && datedWeeks.isNotEmpty()) {
-            val exactDate = baseDate.plusDays(7)
-            datedWeeks.firstOrNull { it.second == exactDate }?.let { return it.first }
-
-            return datedWeeks
-                .filter { it.second.isAfter(baseDate) }
-                .minByOrNull { it.second }
-                ?.first
-        }
-
-        val rawIndex = weeks.indexOfFirst { it.value == baseWeek.value }
-        if (rawIndex < 0) return null
-        return weeks.getOrNull(rawIndex - 1)
-    }
-    private fun WeekInfo.normalizedAgainst(parsedWeek: WeekInfo): WeekInfo {
-        return copy(
-            title = title.ifBlank { parsedWeek.title },
-            isCurrent = isCurrent || parsedWeek.isCurrent,
-            isCached = parsedWeek.isCached
-        )
-    }
-
-    private fun WeekInfo.toStartDateOrNull(): LocalDate? {
-        val rawDate = Regex("\\d{2}\\.\\d{2}\\.\\d{4}").find(value)?.value
-            ?: Regex("\\d{2}\\.\\d{2}\\.\\d{4}").find(title)?.value
-            ?: return null
-        return runCatching { LocalDate.parse(rawDate, WEEK_DATE_FORMATTER) }.getOrNull()
-    }
-
-    private fun buildStudentOwnerId(
-        facultyId: String,
-        departmentId: String,
-        courseId: String,
-        groupId: String
-    ): String = listOf(facultyId, departmentId, courseId, groupId).joinToString(separator = ":")
-
-    private fun buildCacheKey(role: String, ownerId: String, week: WeekInfo): String {
-        return listOf(role, ownerId, week.value).joinToString(separator = "|")
-    }
-
-    private fun toCachedWeekInfos(
-        entities: List<com.example.scheduleiseu.data.local.db.CachedScheduleWeekEntity>
-    ): List<WeekInfo> {
-        return entities.map { entity ->
-            WeekInfo(
-                value = entity.weekValue,
-                title = entity.weekTitle,
-                isCurrent = entity.isCurrentWeek,
-                isCached = true
-            )
-        }.distinctBy { it.value }
-    }
-
-    private companion object {
-        const val ROLE_STUDENT = "student"
-        const val ROLE_TEACHER = "teacher"
-        val WEEK_DATE_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy", Locale("ru"))
-    }
 }
