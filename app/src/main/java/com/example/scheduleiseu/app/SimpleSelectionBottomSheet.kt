@@ -27,9 +27,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.scheduleiseu.core.designsystem.theme.AppColors
 import com.example.scheduleiseu.core.designsystem.theme.AppShapes
+import com.example.scheduleiseu.core.designsystem.theme.ScheduleIsEuTheme
 import com.example.scheduleiseu.core.ui.animation.PressScale
 import com.example.scheduleiseu.core.ui.animation.appAnimatedContentSize
 
@@ -131,5 +133,19 @@ private fun RowCard(
                 )
             }
         }
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF000000)
+@Composable
+private fun SimpleSelectionBottomSheetPreview() {
+    ScheduleIsEuTheme {
+        SimpleSelectionBottomSheet(
+            title = "Выбрать неделю",
+            items = listOf("10.03.2026 - 16.03.2026", "17.03.2026 - 23.03.2026 +"),
+            selectedItem = "17.03.2026 - 23.03.2026 +",
+            onSelect = {},
+            onDismiss = {},
+        )
     }
 }

@@ -23,9 +23,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.scheduleiseu.core.designsystem.theme.AppColors
 import com.example.scheduleiseu.core.designsystem.theme.AppShapes
+import com.example.scheduleiseu.core.designsystem.theme.ScheduleIsEuTheme
 import com.example.scheduleiseu.core.ui.animation.AppCrossfade
 import com.example.scheduleiseu.core.ui.animation.FadeSlideVisibility
 import com.example.scheduleiseu.core.ui.animation.PressScale
@@ -169,5 +171,36 @@ internal fun BootstrapBlockingOverlay(
                 }
             }
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun StartupBlockingOverlayPreview() {
+    ScheduleIsEuTheme {
+        StartupBlockingOverlay()
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun BootstrapBlockingOverlayPreview() {
+    ScheduleIsEuTheme {
+        BootstrapBlockingOverlay(
+            visible = true,
+            errorMessage = "Проверьте подключение к интернету и повторите попытку.",
+            onRetryClick = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun OfflineLoginBannerPreview() {
+    ScheduleIsEuTheme {
+        OfflineLoginBanner(
+            visible = true,
+            onClick = {},
+        )
     }
 }

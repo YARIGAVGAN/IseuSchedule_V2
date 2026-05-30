@@ -41,6 +41,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.example.scheduleiseu.R
@@ -49,6 +50,7 @@ import com.example.scheduleiseu.core.designsystem.theme.AppDimens
 import com.example.scheduleiseu.core.designsystem.theme.AppElevation
 import com.example.scheduleiseu.core.designsystem.theme.AppShapes
 import com.example.scheduleiseu.core.designsystem.theme.AppSpacing
+import com.example.scheduleiseu.core.designsystem.theme.ScheduleIsEuTheme
 import com.example.scheduleiseu.core.ui.animation.AppCrossfade
 import com.example.scheduleiseu.core.ui.animation.FadeVisibility
 import com.example.scheduleiseu.core.ui.animation.PressScale
@@ -439,5 +441,25 @@ private fun MenuButtonItem(
                 )
             }
         }
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF000000)
+@Composable
+private fun MenuDrawerOverlayPreview() {
+    ScheduleIsEuTheme {
+        MenuDrawerOverlay(
+            isOpen = true,
+            onClose = {},
+            onDestinationClick = {},
+            profileState = MenuProfileUiState(
+                isLoading = false,
+                fullName = "Иванов Иван Иванович",
+                groupOrPosition = "ФИТР, ПОИТ-01",
+                details = "3 курс, дневная форма обучения",
+                role = "Студент",
+                averageScore = "8.4",
+            ),
+        )
     }
 }
