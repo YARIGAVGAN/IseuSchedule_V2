@@ -88,10 +88,6 @@ private fun AboutHeroCard(modifier: Modifier = Modifier) {
                 style = MaterialTheme.typography.bodyLarge.copy(color = AppColors.White),
             )
 
-            Text(
-                text = "Версия интерфейса 2.0",
-                style = MaterialTheme.typography.bodySmall.copy(color = AppColors.White.copy(alpha = 0.85f)),
-            )
         }
     }
 }

@@ -293,7 +293,11 @@ private fun HomeScreenPreview() {
             state = ScheduleUiState(
                 days = listOf(
                     ScheduleDay(title = "Понедельник", date = "12.03.2026", lessons = emptyList()),
-                    ScheduleDay(title = "Вторник", date = "13.03.2026", lessons = emptyList())
+                    ScheduleDay(title = "Вторник", date = "13.03.2026", lessons = emptyList()),
+                    ScheduleDay(title = "Среда", date = "14.03.2026", lessons = emptyList()),
+                    ScheduleDay(title = "Четверг", date = "15.03.2026", lessons = emptyList()),
+                    ScheduleDay(title = "Пятница", date = "16.03.2026", lessons = emptyList()),
+                    ScheduleDay(title = "Суббота", date = "17.03.2026", lessons = emptyList())
                 ),
                 selectedDay = ScheduleDay(title = "Понедельник", date = "12.03.2026", lessons = emptyList()),
                 lessonsForSelectedDay = listOf(
@@ -301,7 +305,7 @@ private fun HomeScreenPreview() {
                         id = "1",
                         title = "Объектно-ориентированное проектирование и программирование",
                         type = "практ.зан",
-                        teacherName = "пр. Куканков Григорий Петрович",
+                        teacherName = "пр. Иванов Иван Иванович",
                         classroom = "ауд. 101",
                         startTime = "10:25",
                         endTime = "11:45",
