@@ -52,7 +52,7 @@ Lesson reminders are also planned from cached timetable data. The app uses `Alar
 | UI | Kotlin, Jetpack Compose, Material 3, Navigation Compose |
 | State | ViewModel, Lifecycle, Coroutines, Flow |
 | Local data | Room, DataStore Preferences, file-based photo cache |
-| Network and parsing | OkHttp, Jsoup |
+| Network and parsing | Retrofit, OkHttp, Jsoup |
 | OCR | Google ML Kit Text Recognition |
 | Notifications | AlarmManager, BroadcastReceiver, notification channels |
 | Build | Gradle Kotlin DSL, KSP |
@@ -120,12 +120,6 @@ Run JVM tests:
 
 On macOS or Linux, use `./gradlew` instead of `.\gradlew.bat`.
 
-## Roadmap
-
-- Add parser and repository tests for more network response variants.
-- Add Compose UI tests or screenshot tests for the main flows.
-- Introduce dependency injection as the object graph grows.
-- Prepare a demo APK and a short screen recording.
 
 ## Privacy
 
