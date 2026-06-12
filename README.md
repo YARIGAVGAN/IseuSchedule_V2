@@ -121,6 +121,14 @@ Run JVM tests:
 On macOS or Linux, use `./gradlew` instead of `.\gradlew.bat`.
 
 
-## Privacy
+## Privacy Policy
 
-Do not commit real credentials, tokens, passwords, or private student data. Screenshots and demo builds should use anonymized test data.
+IseuSchedule does not collect, store, process, or share personal user data.
+
+The application does not require registration and does not gather information such as name, email address, phone number, location, contacts, photos, or any other personally identifiable information.
+
+All data displayed in the application is obtained from publicly available sources and is used exclusively to provide schedule-related functionality.
+
+No user data is sold, shared, or transferred to third parties.
+
+For questions regarding this privacy policy, please contact the repository owner through GitHub.
